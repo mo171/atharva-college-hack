@@ -13,17 +13,17 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
+import { Checkbox } from "@/app/components/ui/checkbox";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-} from "@/components/ui/card";
+} from "@/app/components/ui/card";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -51,22 +51,24 @@ export default function SignupPage() {
   };
 
   return (
-    <Card className="border-[#1E1E2D] bg-[#0A0A12] shadow-2xl backdrop-blur-sm">
+    <Card className="overflow-hidden rounded-2xl border border-[#e8e8e0] bg-white shadow-lg shadow-black/5">
       <CardHeader className="space-y-1 pb-6 text-center sm:text-left">
-        <CardTitle className="text-2xl text-white">Create Account</CardTitle>
-        <CardDescription className="text-[#9496A1]">
+        <CardTitle className="text-2xl text-[#2e2e2e]">
+          Create Account
+        </CardTitle>
+        <CardDescription className="text-[#6a6a6a]">
           Join Bharat Biz-Agent and transform your business
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6">
         {/* Toggle / Tabs */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center justify-center gap-2 rounded-xl border border-[#2D2D3A] bg-[#0E0E16] py-2.5 text-sm font-medium text-gray-500 cursor-not-allowed opacity-50">
+          <div className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-[#e0e0d8] bg-[#f5f5f0] py-2.5 text-sm font-medium text-[#888] opacity-60">
             <MessageCircle className="h-4 w-4" />
             WhatsApp
           </div>
 
-          <div className="flex items-center justify-center gap-2 rounded-xl bg-[#7047EB]/10 border border-[#7047EB]/50 py-2.5 text-sm font-medium text-[#A888FF]">
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-[#ced3ff] bg-[#e8ecff] py-2.5 text-sm font-medium text-[#5a5fd8]">
             <Mail className="h-4 w-4" />
             Email
           </div>
@@ -162,13 +164,13 @@ export default function SignupPage() {
                 className="text-xs text-[#9496A1] font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
                 I agree to the{" "}
-                <Link href="/terms" className="text-[#7047EB] hover:underline">
+                <Link href="/terms" className="text-[#5a5fd8] hover:underline">
                   Terms of Service
                 </Link>{" "}
                 and{" "}
                 <Link
                   href="/privacy"
-                  className="text-[#7047EB] hover:underline"
+                  className="text-[#5a5fd8] hover:underline"
                 >
                   Privacy Policy
                 </Link>
@@ -186,7 +188,7 @@ export default function SignupPage() {
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-11 text-base shadow-[0_0_20px_rgba(112,71,235,0.2)]"
+            className="h-11 w-full rounded-xl bg-[#ced3ff] text-base text-[#4a4a7a] shadow-md shadow-[#ced3ff]/30 transition-colors hover:bg-[#b8bff5]"
           >
             {isSubmitting ? (
               <>
@@ -204,10 +206,10 @@ export default function SignupPage() {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-[#2D2D3A]" />
+            <span className="w-full border-t border-[#e8e8e0]" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-[#0A0A12] px-2 text-muted-foreground">
+            <span className="bg-white px-2 text-[#888]">
               Already have an account?
             </span>
           </div>
@@ -216,7 +218,7 @@ export default function SignupPage() {
         <Link href="/login">
           <Button
             variant="secondary"
-            className="w-full h-11 border-[#2D2D3A] bg-transparent hover:bg-[#1A1A24]"
+            className="h-11 w-full rounded-xl border border-[#e0e0d8] bg-[#f8f7ff] text-[#4a4a7a] transition-colors hover:border-[#ced3ff] hover:bg-[#e8ecff]"
           >
             Sign In
           </Button>
