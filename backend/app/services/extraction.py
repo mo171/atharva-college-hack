@@ -1,6 +1,6 @@
 """Core NLP extraction utilities for story analysis + Supabase persistence."""
 
-from _future_ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from importlib import import_module
@@ -11,7 +11,7 @@ from spacy.language import Language
 from spacy.tokens import Doc, Span, Token
 from supabase import Client
 
-from lib.supabase import supabase
+from app.lib.supabase import supabase_client as _default_supabase
 
 
 SUBJECT_DEPS = {"nsubj", "nsubjpass", "csubj", "expl"}
@@ -50,9 +50,9 @@ class ExtractionResult:
 class ExtractionStore:
     """Supabase persistence helper for extraction outputs."""
 
-    def _init_(self, project_id: str, supabase_client: Client | None = None) -> None:
+    def __init__(self, project_id: str, supabase_client: Client | None = None) -> None:
         self.project_id = project_id
-        self.supabase = supabase_client or supabase
+        self.supabase = supabase_client or _default_supabase
 
     def _map_entity_type(self, ner_label: str) -> str:
         return ENTITY_LABEL_MAP.get(ner_label, "OBJECT")

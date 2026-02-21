@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import networkx as nx
 from supabase import Client
 
-from lib.supabase import supabase
+from app.lib.supabase import supabase_client as _default_supabase
 
 
 @dataclass
@@ -22,10 +22,10 @@ class Inconsistency:
 class StoryKnowledgeGraph:
     """Story memory graph that can load from and sync to Supabase."""
 
-    def _init_(self, project_id: str, supabase_client: Client | None = None) -> None:
+    def __init__(self, project_id: str, supabase_client: Client | None = None) -> None:
         self.project_id = project_id
         self.graph = nx.MultiDiGraph()
-        self.supabase = supabase_client or supabase
+        self.supabase = supabase_client or _default_supabase
         self.entity_ids_by_name: dict[str, str] = {}
 
     @classmethod

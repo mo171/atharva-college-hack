@@ -1,8 +1,15 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from app.services.analysis import orchestrator
+
 from app.lib.supabase import supabase_client
+from app.services.analysis import StoryKnowledgeGraph
+from app.services.extraction import (
+    ExtractionStore,
+    build_nlp_pipeline,
+    run_core_nlp_pipeline,
+)
+from app.services.llm_gateway import get_embedding, SupabaseInsightService
 
 router = APIRouter(prefix="/editor", tags=["Narrative Editor"])
 
@@ -28,35 +35,68 @@ class AnalysisResponse(BaseModel):
     resolved_context: str
     detected_actions: List[Dict[str, Any]]
 
+# --- SHARED ANALYSIS LOGIC ---
+
+
+async def run_analysis(project_id: str, text_content: str) -> dict:
+    """
+    Run the full analysis pipeline: extraction, persistence, KG update, insight generation.
+    Returns the same dict shape as AnalysisResponse for use by HTTP and WebSocket routes.
+    """
+    nlp = build_nlp_pipeline(model_name="en_core_web_sm", enable_coref=False)
+    result = run_core_nlp_pipeline(text_content, nlp)
+
+    embedding = None
+    try:
+        embedding = get_embedding(result.normalized_text)
+    except Exception:
+        pass
+
+    store = ExtractionStore(project_id=project_id, supabase_client=supabase_client)
+    store.upsert_entities(result.entities)
+    store.insert_narrative_chunk(content=result.normalized_text, embedding=embedding)
+
+    kg = StoryKnowledgeGraph.from_supabase(project_id=project_id, supabase_client=supabase_client)
+    kg.apply_svo_triples(result.triples, persist=True, original_text=text_content)
+
+    insight_service = SupabaseInsightService(project_id=project_id)
+    alerts_data = insight_service.process_pending_logs()
+
+    entities_out = [
+        {"name": e["text"], "type": e.get("label", "OBJECT")}
+        for e in result.entities
+    ]
+    alerts_out = [
+        {"type": "INCONSISTENCY", "entity": None, "explanation": item["alert"]}
+        for item in alerts_data
+    ]
+    detected_actions = [
+        {"subject": t.subject, "relation": t.relation, "object": t.object, "sentence": t.sentence}
+        for t in result.triples
+    ]
+
+    return {
+        "status": "success",
+        "entities": entities_out,
+        "alerts": alerts_out,
+        "resolved_context": result.normalized_text,
+        "detected_actions": detected_actions,
+    }
+
+
 # --- ROUTES ---
 
 @router.post("/analyze", response_model=AnalysisResponse)
 async def analyze_writing(request: WriteRequest):
     """
-    The heart of the app. Receives text, runs the NLP pipeline, 
-    checks DB consistency, and returns intelligent insights.
+    Runs NLP extraction, persists entities/chunks, updates story knowledge graph,
+    logs inconsistencies, and returns entities, alerts, and detected actions.
     """
     try:
-        # Trigger the Orchestrator (Logic + DB + LLM)
-        result = await orchestrator.process_text_block(
-            project_id=request.project_id, 
-            text_content=request.content
-        )
-        
-        return {
-            "status": "success",
-            "entities": result.get("entities", []),
-            "alerts": result.get("alerts", []),
-            "resolved_context": result.get("normalized_text", ""),
-            "detected_actions": result.get("triples", [])
-        }
+        return await run_analysis(project_id=request.project_id, text_content=request.content)
     except Exception as e:
-        # Crucial for Hackathons: provide clear logs for the team to debug
         print(f"CRITICAL ERROR in /editor/analyze: {str(e)}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Narrative Engine Error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Narrative Engine Error: {str(e)}")
 
 @router.get("/story-brain/{project_id}")
 async def fetch_story_brain(project_id: str):

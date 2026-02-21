@@ -1,6 +1,6 @@
 """OpenAI gateway utilities for author-facing insight generation + Supabase sync."""
 
-from _future_ import annotations
+from __future__ import annotations
 
 import os
 import re
@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from openai import OpenAI
 from supabase import Client
 
-from lib.supabase import supabase
+from app.lib.supabase import supabase_client as _default_supabase
 
 
 @dataclass
@@ -28,7 +28,7 @@ class InsightGenerator:
     This replaces a local-LLM (e.g. Ollama) workflow with OpenAI API calls.
     """
 
-    def _init_(self, api_key: str | None = None, model: str = "gpt-4o-mini") -> None:
+    def __init__(self, api_key: str | None = None, model: str = "gpt-4o-mini") -> None:
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
         if not self.api_key:
             raise RuntimeError("OPENAI_API_KEY is required for insight generation.")
@@ -77,7 +77,7 @@ class InsightGenerator:
 class SupabaseInsightService:
     """Generate and persist author alerts for consistency logs in Supabase."""
 
-    def _init_(
+    def __init__(
         self,
         project_id: str,
         api_key: str | None = None,
@@ -85,7 +85,7 @@ class SupabaseInsightService:
         supabase_client: Client | None = None,
     ) -> None:
         self.project_id = project_id
-        self.supabase = supabase_client or supabase
+        self.supabase = supabase_client or _default_supabase
         self.generator = InsightGenerator(api_key=api_key, model=model)
 
     @staticmethod
@@ -198,3 +198,13 @@ def generate_and_store_alert_for_log(
         existing_objects=existing_objects,
     )
     return service.generate_and_store_alert(log_id=log_id, conflict=conflict, max_words=max_words)
+
+
+def get_embedding(text: str, api_key: str | None = None, model: str = "text-embedding-3-small") -> list[float]:
+    """Return embedding vector for text. Used by project_setup and extraction persist flow."""
+    key = api_key or os.environ.get("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("OPENAI_API_KEY is required for embeddings.")
+    client = OpenAI(api_key=key)
+    resp = client.embeddings.create(model=model, input=[text])
+    return resp.data[0].embedding
