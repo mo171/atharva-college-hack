@@ -5,11 +5,13 @@ from typing import List, Optional, Dict, Any
 from app.lib.supabase import supabase_client
 from app.services.analysis import StoryKnowledgeGraph
 from app.services.extraction import (
+    ENTITY_LABEL_MAP,
     ExtractionStore,
     build_nlp_pipeline,
     run_core_nlp_pipeline,
 )
 from app.services.llm_gateway import get_embedding, SupabaseInsightService
+from app.services.character_summary import update_character_summary
 
 router = APIRouter(prefix="/editor", tags=["Narrative Editor"])
 
@@ -61,6 +63,32 @@ async def run_analysis(project_id: str, text_content: str) -> dict:
 
     insight_service = SupabaseInsightService(project_id=project_id)
     alerts_data = insight_service.process_pending_logs()
+
+    # Update character persona/story summaries for CHARACTERs in this chunk (real-time)
+    character_names = [
+        e["text"].strip()
+        for e in result.entities
+        if e["text"].strip()
+        and ENTITY_LABEL_MAP.get(e.get("label", ""), "OBJECT") == "CHARACTER"
+    ]
+    if character_names:
+        char_entities = (
+            supabase_client.table("entities")
+            .select("id")
+            .eq("project_id", project_id)
+            .eq("entity_type", "CHARACTER")
+            .in_("name", character_names[:5])
+            .execute()
+        )
+        for row in (char_entities.data or []):
+            try:
+                update_character_summary(
+                    project_id=project_id,
+                    entity_id=row["id"],
+                    supabase_client=supabase_client,
+                )
+            except Exception:
+                pass
 
     entities_out = [
         {"name": e["text"], "type": e.get("label", "OBJECT")}
@@ -123,6 +151,38 @@ async def fetch_story_brain(project_id: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail="Could not load Story Brain state.")
+
+class RefreshCharacterSummaryRequest(BaseModel):
+    project_id: str = Field(..., example="uuid-123-project")
+    entity_id: str = Field(..., example="uuid-456-entity")
+
+
+@router.post("/refresh-character-summary")
+async def refresh_character_summary(request: RefreshCharacterSummaryRequest):
+    """
+    Refresh persona and story summary for a single character on demand.
+    Useful when the user opens a character detail view or clicks Refresh.
+    """
+    try:
+        updated = update_character_summary(
+            project_id=request.project_id,
+            entity_id=request.entity_id,
+            supabase_client=supabase_client,
+        )
+        if updated is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Entity not found or is not a CHARACTER.",
+            )
+        return {"status": "success", "metadata": updated}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not refresh character summary: {str(e)}",
+        )
+
 
 @router.post("/update-entity")
 async def manual_entity_update(entity_id: str, metadata_patch: Dict[str, Any]):

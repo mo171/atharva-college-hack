@@ -1,9 +1,11 @@
 import os
+from pathlib import Path
 from typing import List
 
 from dotenv import load_dotenv
 
-
+# Load .env from app directory so it works regardless of cwd
+load_dotenv(Path(__file__).resolve().parent / ".env")
 load_dotenv()
 
 

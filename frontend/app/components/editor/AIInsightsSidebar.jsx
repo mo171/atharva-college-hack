@@ -1,37 +1,42 @@
+"use client";
+
+import { useState } from "react";
 import { AlertTriangle, Wand2, Target, Square } from "lucide-react";
 
 import { Button } from "@/app/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const INSIGHT_CARDS = [
-  {
-    type: "Inconsistency Alert",
-    subLabel: "Spatial Logic",
+const ALERT_STYLES = {
+  INCONSISTENCY: {
+    subLabel: "Continuity",
     headerBg: "bg-[#fff5e1]/80",
     icon: AlertTriangle,
     iconColor: "text-amber-500",
-    text: "The cellar was described as having a single entrance in Chapter 3. This passage implies multiple possible exits. Consider reconciling the spatial layout.",
-    primaryAction: "JUMP TO",
+    primaryAction: "REVIEW",
   },
-  {
-    type: "Clarity Suggestion",
-    subLabel: "Word Choice",
+  POV_SHIFT: {
+    subLabel: "Point of View",
     headerBg: "bg-[#f8deff]/60",
     icon: Wand2,
     iconColor: "text-[#5a5fd8]",
-    text: "The phrase 'the kind of silence that seemed to listen' is evocative. Consider reinforcing this motif in the following paragraph for stronger atmosphere.",
-    primaryAction: "APPLY",
+    primaryAction: "FIX",
   },
-  {
-    type: "Tone Alignment",
-    subLabel: "Sentiment Shift",
+  TONE_CLASH: {
+    subLabel: "Tone",
     headerBg: "bg-[#cff8ff]/60",
     icon: Target,
     iconColor: "text-[#1e88e5]",
-    text: "The tension dips briefly in the third paragraph. A subtle sensory detail—sound, temperature—could maintain momentum before the final line.",
     primaryAction: "ANALYZE",
   },
-];
+};
+
+const DEFAULT_STYLE = {
+  subLabel: "Suggestion",
+  headerBg: "bg-[#e8ecff]/60",
+  icon: AlertTriangle,
+  iconColor: "text-[#5a5fd8]",
+  primaryAction: "REVIEW",
+};
 
 function InsightCard({
   type,
@@ -41,6 +46,7 @@ function InsightCard({
   iconColor,
   text,
   primaryAction,
+  onDismiss,
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-[#e8e8e0] bg-white shadow-md shadow-black/5">
@@ -54,7 +60,7 @@ function InsightCard({
       <div className="p-4">
         <p className="text-sm leading-relaxed text-[#2e2e2e]">{text}</p>
         <div className="mt-4 flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1">
+          <Button variant="outline" size="sm" className="flex-1" onClick={onDismiss}>
             DISMISS
           </Button>
           <Button
@@ -69,7 +75,18 @@ function InsightCard({
   );
 }
 
-function AIInsightsSidebar({ className, ...props }) {
+function AIInsightsSidebar({ alerts = [], className, ...props }) {
+  const [dismissed, setDismissed] = useState(new Set());
+
+  const visibleAlerts = alerts
+    .map((a, i) => ({ ...a, _idx: i }))
+    .filter((a) => !dismissed.has(a._idx));
+  const count = visibleAlerts.length;
+
+  const handleDismiss = (idx) => {
+    setDismissed((prev) => new Set([...prev, idx]));
+  };
+
   return (
     <aside
       className={cn(
@@ -82,13 +99,33 @@ function AIInsightsSidebar({ className, ...props }) {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-[#2e2e2e]">
           AI Insights
         </h2>
-        <p className="mt-1 text-xs text-[#888]">3 active alerts</p>
+        <p className="mt-1 text-xs text-[#888]">
+          {count} active alert{count !== 1 ? "s" : ""}
+        </p>
       </div>
 
       <div className="space-y-4">
-        {INSIGHT_CARDS.map((card) => (
-          <InsightCard key={card.type} {...card} />
-        ))}
+        {visibleAlerts.map((alert) => {
+          const style = ALERT_STYLES[alert.type] ?? DEFAULT_STYLE;
+          return (
+            <InsightCard
+              key={`${alert.type}-${alert._idx}-${(alert.explanation || "").slice(0, 20)}`}
+              type={alert.type ?? "Alert"}
+              subLabel={style.subLabel}
+              headerBg={style.headerBg}
+              icon={style.icon}
+              iconColor={style.iconColor}
+              text={alert.explanation ?? "—"}
+              primaryAction={style.primaryAction}
+              onDismiss={() => handleDismiss(alert._idx)}
+            />
+          );
+        })}
+        {count === 0 && (
+          <p className="text-xs text-[#888]">
+            No alerts. Keep writing to get real-time consistency feedback.
+          </p>
+        )}
       </div>
 
       <div className="mt-auto space-y-3">

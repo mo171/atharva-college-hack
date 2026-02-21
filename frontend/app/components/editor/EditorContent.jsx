@@ -1,3 +1,6 @@
+"use client";
+
+import { useRef, useEffect, useCallback } from "react";
 import {
   Bold,
   Italic,
@@ -14,8 +17,48 @@ import {
 import { Button } from "@/app/components/ui/button";
 import { EditorContainer } from "@/features/editor";
 import { cn } from "@/lib/utils";
+import { analyzeWriting } from "@/lib/api";
 
-function EditorContent({ className, ...props }) {
+function EditorContent({
+  projectId,
+  alerts,
+  onAnalysis,
+  onStoryBrainRefresh,
+  className,
+  ...props
+}) {
+  const debounceRef = useRef(null);
+  const lastContentRef = useRef("");
+
+  const handleContentChange = useCallback(
+    (text) => {
+      if (!projectId || !text?.trim()) return;
+      lastContentRef.current = text;
+
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(async () => {
+        debounceRef.current = null;
+        try {
+          const payload = await analyzeWriting({
+            projectId,
+            content: lastContentRef.current,
+          });
+          onAnalysis?.(payload);
+          onStoryBrainRefresh?.();
+        } catch (err) {
+          console.error("Analysis failed:", err);
+        }
+      }, 800);
+    },
+    [projectId, onAnalysis, onStoryBrainRefresh]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   return (
     <main
       className={cn(
@@ -84,7 +127,7 @@ function EditorContent({ className, ...props }) {
 
         {/* Chapter body */}
         <div className="space-y-4 text-[15px] leading-relaxed text-[#2e2e2e]">
-          <EditorContainer />
+          <EditorContainer onContentChange={handleContentChange} />
         </div>
 
         {/* Footer */}

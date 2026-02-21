@@ -6,7 +6,7 @@ import { EditorCanvas } from "../components/EditorCanvas";
 
 const DEFAULT_HTML = `<p>Elias descended the worn stone steps, the smell of dried herbs and decay thickening with each step. The apothecary's cellar had always felt like a threshold between worlds—half laboratory, half crypt.</p><p><span style="text-decoration: underline; text-decoration-color: #cff8ff; text-underline-offset: 2px;">He remembered the sunlit garden outside, a stark contrast to the darkness he now inhabited.</span> The memory felt distant, almost belonging to another man.</p><p><span style="border-radius: 4px; background-color: #fff5e1; padding: 0 2px;">He stood up and looked around the room, wondering where the potion could have gone.</span> The shelves were lined with amber bottles, their labels faded beyond recognition. None of them resembled what he had come for.</p><p>A faint draft stirred the dust. Elias turned, but the shadows yielded nothing. The silence was total—the kind of silence that seemed to listen.</p>`;
 
-function EditorContainer({ className, ...props }) {
+function EditorContainer({ onContentChange, className, ...props }) {
   const editorRef = useRef(null);
   const [isEmpty, setIsEmpty] = useState(false);
   const hasInitialized = useRef(false);
@@ -20,7 +20,11 @@ function EditorContainer({ className, ...props }) {
 
   const handleInput = useCallback(() => {
     checkEmpty();
-  }, [checkEmpty]);
+    const el = editorRef.current;
+    if (el && onContentChange) {
+      onContentChange(el.innerText ?? "");
+    }
+  }, [checkEmpty, onContentChange]);
 
   useEffect(() => {
     const el = editorRef.current;
