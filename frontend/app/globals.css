@@ -5,6 +5,12 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --color-app-bg: var(--app-bg);
+  --color-pastel-cyan: var(--pastel-cyan);
+  --color-pastel-lavender: var(--pastel-lavender);
+  --color-pastel-cream: var(--pastel-cream);
+  --color-pastel-mint: var(--pastel-mint);
+  --color-pastel-blue: var(--pastel-blue);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -48,7 +54,15 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --app-bg: #fffff2;
+  --pastel-cyan: #cff8ff;
+  --pastel-lavender: #f8deff;
+  --pastel-cream: #fff5e1;
+  --pastel-mint: #e0ffe3;
+  --pastel-blue: #ced3ff;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -121,6 +135,22 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--app-bg);
+    @apply text-foreground;
   }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 350ms ease-out forwards;
 }
