@@ -1,23 +1,35 @@
-"""Core NLP extraction utilities for story analysis.
+"""Core NLP extraction utilities for story analysis + Supabase persistence."""
 
-This module provides a lightweight pipeline around spaCy + fastcoref for:
-1) Named entity extraction (NER)
-2) Coreference resolution
-3) Subject-Verb-Object (SVO) event extraction
-"""
-
-from __future__ import annotations
+from _future_ import annotations
 
 from dataclasses import dataclass
 from importlib import import_module
 from importlib.util import find_spec
+
 import spacy
 from spacy.language import Language
 from spacy.tokens import Doc, Span, Token
+from supabase import Client
+
+from lib.supabase import supabase
 
 
 SUBJECT_DEPS = {"nsubj", "nsubjpass", "csubj", "expl"}
 OBJECT_DEPS = {"dobj", "obj", "iobj", "attr", "oprd", "dative", "pobj"}
+ENTITY_LABEL_MAP = {
+    "PERSON": "CHARACTER",
+    "GPE": "LOCATION",
+    "LOC": "LOCATION",
+    "FAC": "LOCATION",
+    "ORG": "OBJECT",
+    "NORP": "OBJECT",
+    "PRODUCT": "OBJECT",
+    "EVENT": "OBJECT",
+    "WORK_OF_ART": "OBJECT",
+    "LANGUAGE": "OBJECT",
+    "DATE": "OBJECT",
+    "TIME": "OBJECT",
+}
 
 
 @dataclass
@@ -35,21 +47,75 @@ class ExtractionResult:
     triples: list[SVOTriple]
 
 
-def build_nlp_pipeline(model_name: str = "en_core_web_sm", enable_coref: bool = True) -> Language:
-    """Build and return a spaCy pipeline with optional fastcoref component.
+class ExtractionStore:
+    """Supabase persistence helper for extraction outputs."""
 
-    Args:
-        model_name: spaCy model name.
-        enable_coref: Whether to add fastcoref component.
-    """
+    def _init_(self, project_id: str, supabase_client: Client | None = None) -> None:
+        self.project_id = project_id
+        self.supabase = supabase_client or supabase
+
+    def _map_entity_type(self, ner_label: str) -> str:
+        return ENTITY_LABEL_MAP.get(ner_label, "OBJECT")
+
+    def _entity_exists(self, name: str) -> bool:
+        row = (
+            self.supabase.table("entities")
+            .select("id")
+            .eq("project_id", self.project_id)
+            .eq("name", name)
+            .limit(1)
+            .execute()
+        )
+        return bool(row.data)
+
+    def upsert_entities(self, entities: list[dict[str, str]]) -> None:
+        for entity in entities:
+            name = entity["text"].strip()
+            if not name:
+                continue
+            if self._entity_exists(name):
+                continue
+
+            self.supabase.table("entities").insert(
+                {
+                    "project_id": self.project_id,
+                    "name": name,
+                    "entity_type": self._map_entity_type(entity["label"]),
+                    "is_initial_setup": False,
+                }
+            ).execute()
+
+    def insert_narrative_chunk(self, content: str, embedding: list[float] | None = None) -> None:
+        max_index_query = (
+            self.supabase.table("narrative_chunks")
+            .select("chunk_index")
+            .eq("project_id", self.project_id)
+            .order("chunk_index", desc=True)
+            .limit(1)
+            .execute()
+        )
+        latest = max_index_query.data or []
+        next_idx = (latest[0]["chunk_index"] + 1) if latest else 1
+
+        payload: dict[str, object] = {
+            "project_id": self.project_id,
+            "content": content,
+            "chunk_index": next_idx,
+        }
+        if embedding is not None:
+            payload["embedding"] = embedding
+
+        self.supabase.table("narrative_chunks").insert(payload).execute()
+
+
+def build_nlp_pipeline(model_name: str = "en_core_web_sm", enable_coref: bool = True) -> Language:
+    """Build and return a spaCy pipeline with optional fastcoref component."""
     nlp = spacy.load(model_name)
 
     if enable_coref and "fastcoref" not in nlp.pipe_names:
         fastcoref_spec = find_spec("fastcoref")
         if fastcoref_spec is None:
-            raise RuntimeError(
-                "fastcoref is not installed. Install with: pip install fastcoref"
-            )
+            raise RuntimeError("fastcoref is not installed. Install with: pip install fastcoref")
 
         import_module("fastcoref")
         nlp.add_pipe("fastcoref", last=True)
@@ -58,12 +124,10 @@ def build_nlp_pipeline(model_name: str = "en_core_web_sm", enable_coref: bool = 
 
 
 def extract_named_entities(doc: Doc) -> list[dict[str, str]]:
-    """Return named entities as simple dictionaries."""
     return [{"text": ent.text, "label": ent.label_} for ent in doc.ents]
 
 
 def resolve_coreferences(doc: Doc) -> str:
-    """Return resolved text if fastcoref is available on the pipeline output."""
     if not Doc.has_extension("resolved_text"):
         return doc.text
 
@@ -100,7 +164,6 @@ def _triples_from_sentence(sentence: Span) -> list[SVOTriple]:
         subjects = _collect_subjects(token)
         objects = _collect_objects(token)
 
-        # Basic SVO triples, e.g. (Sarah, handed, key)
         for subject in subjects:
             for obj in objects:
                 triples.append(
@@ -112,7 +175,6 @@ def _triples_from_sentence(sentence: Span) -> list[SVOTriple]:
                     )
                 )
 
-        # Prepositional relations, e.g. (Sarah, TO, John)
         for prep in [child for child in token.children if child.dep_ == "prep"]:
             pobj_candidates = [child for child in prep.children if child.dep_ == "pobj"]
             for subject in subjects:
@@ -130,7 +192,6 @@ def _triples_from_sentence(sentence: Span) -> list[SVOTriple]:
 
 
 def extract_svo_triples(doc: Doc) -> list[SVOTriple]:
-    """Extract SVO and prepositional action triples from a spaCy Doc."""
     triples: list[SVOTriple] = []
     for sentence in doc.sents:
         triples.extend(_triples_from_sentence(sentence))
@@ -160,10 +221,20 @@ def run_core_nlp_pipeline(text: str, nlp: Language) -> ExtractionResult:
         triples=triples,
     )
 
-# Initialize the pipeline ONCE here
-# Use "en_core_web_md" instead of "sm" for better accuracy if your RAM allows
-nlp_pipeline = build_nlp_pipeline(model_name="en_core_web_md", enable_coref=True)
 
-def get_extracted_data(text: str):
-    # This is the function the Backend Lead will call
-    return run_core_nlp_pipeline(text, nlp_pipeline)
+def run_and_persist_core_nlp_pipeline(
+    *,
+    project_id: str,
+    text: str,
+    nlp: Language,
+    embedding: list[float] | None = None,
+    supabase_client: Client | None = None,
+) -> ExtractionResult:
+    """Run extraction and write entities/chunks to Supabase."""
+    result = run_core_nlp_pipeline(text=text, nlp=nlp)
+
+    store = ExtractionStore(project_id=project_id, supabase_client=supabase_client)
+    store.upsert_entities(result.entities)
+    store.insert_narrative_chunk(content=result.normalized_text, embedding=embedding)
+
+    return result
