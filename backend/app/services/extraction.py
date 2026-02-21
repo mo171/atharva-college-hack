@@ -12,7 +12,7 @@ from spacy.tokens import Doc, Span, Token
 from supabase import Client
 
 from lib.supabase import supabase_client as _default_supabase
-
+from functools import lru_cache
 
 SUBJECT_DEPS = {"nsubj", "nsubjpass", "csubj", "expl"}
 OBJECT_DEPS = {"dobj", "obj", "iobj", "attr", "oprd", "dative", "pobj"}
@@ -85,7 +85,9 @@ class ExtractionStore:
                 }
             ).execute()
 
-    def insert_narrative_chunk(self, content: str, embedding: list[float] | None = None) -> None:
+    def insert_narrative_chunk(
+        self, content: str, embedding: list[float] | None = None
+    ) -> None:
         max_index_query = (
             self.supabase.table("narrative_chunks")
             .select("chunk_index")
@@ -108,19 +110,31 @@ class ExtractionStore:
         self.supabase.table("narrative_chunks").insert(payload).execute()
 
 
-def build_nlp_pipeline(model_name: str = "en_core_web_sm", enable_coref: bool = True) -> Language:
+def build_nlp_pipeline(
+    model_name: str = "en_core_web_sm", enable_coref: bool = True
+) -> Language:
     """Build and return a spaCy pipeline with optional fastcoref component."""
     nlp = spacy.load(model_name)
 
     if enable_coref and "fastcoref" not in nlp.pipe_names:
         fastcoref_spec = find_spec("fastcoref")
         if fastcoref_spec is None:
-            raise RuntimeError("fastcoref is not installed. Install with: pip install fastcoref")
+            raise RuntimeError(
+                "fastcoref is not installed. Install with: pip install fastcoref"
+            )
 
         import_module("fastcoref")
         nlp.add_pipe("fastcoref", last=True)
 
     return nlp
+
+
+@lru_cache(maxsize=2)
+def get_cached_nlp_pipeline(
+    model_name: str = "en_core_web_sm", enable_coref: bool = False
+) -> Language:
+    """Return a cached spaCy pipeline to avoid rebuilding it on every request."""
+    return build_nlp_pipeline(model_name=model_name, enable_coref=enable_coref)
 
 
 def extract_named_entities(doc: Doc) -> list[dict[str, str]]:

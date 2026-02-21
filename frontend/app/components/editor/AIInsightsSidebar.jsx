@@ -60,7 +60,12 @@ function InsightCard({
       <div className="p-4">
         <p className="text-sm leading-relaxed text-[#2e2e2e]">{text}</p>
         <div className="mt-4 flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={onDismiss}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={onDismiss}
+          >
             DISMISS
           </Button>
           <Button
@@ -90,7 +95,7 @@ function AIInsightsSidebar({ alerts = [], className, ...props }) {
   return (
     <aside
       className={cn(
-        "flex w-80 shrink-0 flex-col gap-6 border-l border-[#e8e8e0] bg-[#f8f7ff] p-4",
+        "custom-scrollbar flex w-80 shrink-0 flex-col gap-6 overflow-y-auto border-l border-[#e8e8e0] bg-[#f8f7ff] p-4",
         className,
       )}
       {...props}

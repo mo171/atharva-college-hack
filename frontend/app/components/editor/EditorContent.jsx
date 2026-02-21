@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState } from "react";
+// import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import {
   Bold,
   Italic,
@@ -30,29 +31,49 @@ function EditorContent({
 }) {
   const debounceRef = useRef(null);
   const lastContentRef = useRef("");
+  const [editorText, setEditorText] = useState("");
+  const [syncStatus, setSyncStatus] = useState("Idle");
+  const [chapter, setChapter] = useState("Chapter Five:");
+  const [title, setTitle] = useState("The Apothecary's Silence");
+
+  const wordCount = useMemo(() => {
+    const words = editorText.trim().split(/\s+/).filter(Boolean);
+    return words.length;
+  }, [editorText]);
+
+  const readingMinutes = useMemo(() => {
+    if (!wordCount) return 0;
+    return Math.max(1, Math.ceil(wordCount / 200));
+  }, [wordCount]);
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleContentChange = useCallback(
     (text) => {
       if (!projectId || !text?.trim()) return;
       lastContentRef.current = text;
+      setEditorText(text);
+      setSyncStatus("Typing...");
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(async () => {
         debounceRef.current = null;
         try {
           // Auto-save only, no analysis
+          setSyncStatus("Analyzing...");
           await saveWriting({
             projectId,
             content: lastContentRef.current,
           });
           onStoryBrainRefresh?.();
+          setSyncStatus("Synced");
         } catch (err) {
           console.error("Auto-save failed:", err);
+          setSyncStatus("Sync error");
         }
-      }, 2000); // 2 second debounce for auto-save
+      }, 900); // 2 second debounce for auto-save
     },
-    [projectId, onStoryBrainRefresh],
+    [projectId, onAnalysis, onStoryBrainRefresh],
   );
 
   const handleManualAnalyze = async () => {
@@ -142,18 +163,26 @@ function EditorContent({
         </div>
 
         {/* Chapter title */}
-        <div className="mb-2">
-          <h1 className="text-2xl font-semibold text-[#2e2e2e]">
-            Chapter Five:
-          </h1>
-          <h2 className="text-4xl font-bold text-[#5a5fd8]">
-            The Apothecary&apos;s Silence
-          </h2>
+        <div className="mb-2 flex flex-col">
+          <input
+            type="text"
+            value={chapter}
+            onChange={(e) => setChapter(e.target.value)}
+            className="w-full border-none bg-transparent p-0 text-2xl font-semibold text-[#2e2e2e] focus:outline-none focus:ring-0"
+            placeholder="Chapter..."
+          />
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full border-none bg-transparent p-0 text-4xl font-bold text-[#5a5fd8] focus:outline-none focus:ring-0"
+            placeholder="Title..."
+          />
         </div>
         <div className="mb-8 flex gap-6 text-xs text-[#888]">
           <span className="flex items-center gap-1.5">
             <FileText className="h-3.5 w-3.5" />
-            1,240 words
+            {wordCount.toLocaleString()} words
           </span>
           <span className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5" />6 min read
@@ -172,9 +201,11 @@ function EditorContent({
         <div className="mt-12 flex flex-wrap gap-2 text-[11px] text-[#888]">
           <span>DRAFT 0.4.2</span>
           <span>•</span>
-          <span>SYNC: COMPLETE</span>
+          <span>SYNC: {syncStatus.toLowerCase()}</span>
+
           <span>•</span>
           <span>READING LEVEL: GRADE 9</span>
+
           <span>•</span>
           <span>SENTIMENT: 42% SUSPENSE</span>
         </div>

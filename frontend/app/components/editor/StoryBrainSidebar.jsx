@@ -83,7 +83,7 @@ function StoryBrainSidebar({
   return (
     <aside
       className={cn(
-        "flex w-64 shrink-0 flex-col gap-6 border-r border-[#e8e8e0] bg-[#f8f7ff] p-4",
+        "custom-scrollbar flex w-64 shrink-0 flex-col gap-6 overflow-y-auto border-r border-[#e8e8e0] bg-[#f8f7ff] p-4",
         className,
       )}
       {...props}

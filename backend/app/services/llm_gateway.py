@@ -102,7 +102,7 @@ class SupabaseInsightService:
         relation = "RELATED_TO"
         object_value = "UNKNOWN_OBJECT"
 
-        match = re.search(r"Inconsistency for \((.*?), (.*?), (.*?)\)", explanation)
+        match = re.search(r"Inconsistency for \((.?), (.?), (.*?)\)", explanation)
         if match:
             subject = match.group(1).strip()
             relation = match.group(2).strip()

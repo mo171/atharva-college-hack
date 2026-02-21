@@ -66,7 +66,7 @@ function EditorContainer({ onContentChange, alerts, className, ...props }) {
     if (!el || hasInitialized.current) return;
     hasInitialized.current = true;
     el.innerHTML = DEFAULT_HTML;
-    setIsEmpty(false);
+    // setIsEmpty(false);
     requestAnimationFrame(() => {
       el.focus();
     });

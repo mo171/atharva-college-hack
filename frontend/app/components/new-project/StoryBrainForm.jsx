@@ -76,7 +76,12 @@ function StoryBrainForm({ className, ...props }) {
 
     setIsSubmitting(true);
     try {
-      const userId = user?.id ?? "00000000-0000-0000-0000-000000000000";
+      // const userId = user?.id ?? "00000000-0000-0000-0000-000000000000";
+      if (!user?.id) {
+        toast.error("Please log in before creating a project.");
+        return;
+      }
+      const userId = user.id;
       const { project_id } = await createStoryBrain({
         userId,
         title: storyTitle.trim(),
