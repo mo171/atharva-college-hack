@@ -9,3 +9,4 @@ networkx
 pydantic
 httpx
 pytest
+pyspellchecker

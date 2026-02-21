@@ -13,6 +13,7 @@ from services.extraction import (
 )
 from services.llm_gateway import get_embedding, SupabaseInsightService
 from services.character_summary import update_character_summary
+from services.correction import get_correction_suite
 
 router = APIRouter(prefix="/editor", tags=["Narrative Editor"])
 
@@ -118,6 +119,12 @@ async def run_analysis(project_id: str, text_content: str) -> dict:
         }
         for item in alerts_data
     ]
+
+    # --- MICRO (THE POLISH) ---
+    correction_suite = get_correction_suite()
+    polish_alerts = correction_suite.analyze_polish(text_content)
+    alerts_out.extend(polish_alerts)
+
     detected_actions = [
         {
             "subject": t.subject,

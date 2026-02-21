@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Wand2, Target, Square } from "lucide-react";
+import { AlertTriangle, Wand2, Target, Square, FileText } from "lucide-react";
 
 import { Button } from "@/app/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,20 @@ const ALERT_STYLES = {
     icon: Target,
     iconColor: "text-[#1e88e5]",
     primaryAction: "ANALYZE",
+  },
+  SPELLING: {
+    subLabel: "Spelling",
+    headerBg: "bg-red-50/60",
+    icon: AlertTriangle,
+    iconColor: "text-red-500",
+    primaryAction: "FIX",
+  },
+  GRAMMAR: {
+    subLabel: "Grammar",
+    headerBg: "bg-blue-50/60",
+    icon: FileText,
+    iconColor: "text-blue-500",
+    primaryAction: "REVIEW",
   },
 };
 

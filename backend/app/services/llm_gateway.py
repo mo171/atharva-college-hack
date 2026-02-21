@@ -79,6 +79,53 @@ class InsightGenerator:
 
         return alert
 
+    def generate_grammar_alerts(self, text: str) -> list[dict]:
+        """Detect grammar, punctuation, and style issues using LLM."""
+        prompt = (
+            "You are a professional copyeditor. Analyze the following text for grammar, punctuation, and flow issues. "
+            "Return a list of alerts in the following format, separated by newlines:\n"
+            "TYPE: [GRAMMAR|STYLE] | TEXT: [specific error clip] | EXPLANATION: [concise suggestion]\n\n"
+            "If no issues, return 'OK'.\n\n"
+            f'Text: "{text}"'
+        )
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+        )
+
+        output = (response.choices[0].message.content or "").strip()
+        if output == "OK" or not output:
+            return []
+
+        alerts = []
+        for line in output.split("\n"):
+            if "|" not in line:
+                continue
+            parts = line.split("|")
+            alert_type = "GRAMMAR"
+            original_text = ""
+            explanation = ""
+
+            for part in parts:
+                if "TYPE:" in part:
+                    alert_type = part.replace("TYPE:", "").strip()
+                elif "TEXT:" in part:
+                    original_text = part.replace("TEXT:", "").strip()
+                elif "EXPLANATION:" in part:
+                    explanation = part.replace("EXPLANATION:", "").strip()
+
+            alerts.append(
+                {
+                    "type": alert_type,
+                    "entity": None,
+                    "explanation": explanation,
+                    "original_text": original_text,
+                }
+            )
+        return alerts
+
 
 class SupabaseInsightService:
     """Generate and persist author alerts for consistency logs in Supabase."""
