@@ -7,7 +7,7 @@ from services.analysis import StoryKnowledgeGraph
 from services.extraction import (
     ENTITY_LABEL_MAP,
     ExtractionStore,
-    build_nlp_pipeline,
+    get_cached_nlp_pipeline,
     run_core_nlp_pipeline,
 )
 from services.llm_gateway import get_embedding, SupabaseInsightService
@@ -52,7 +52,7 @@ async def run_analysis(project_id: str, text_content: str) -> dict:
     Run the full analysis pipeline: extraction, persistence, KG update, insight generation.
     Returns the same dict shape as AnalysisResponse for use by HTTP and WebSocket routes.
     """
-    nlp = build_nlp_pipeline(model_name="en_core_web_sm", enable_coref=False)
+    nlp = get_cached_nlp_pipeline(model_name="en_core_web_sm", enable_coref=False)
     result = run_core_nlp_pipeline(text_content, nlp)
 
     embedding = None
@@ -80,13 +80,14 @@ async def run_analysis(project_id: str, text_content: str) -> dict:
         if e["text"].strip()
         and ENTITY_LABEL_MAP.get(e.get("label", ""), "OBJECT") == "CHARACTER"
     ]
-    if character_names:
+    unique_character_names = list(dict.fromkeys(character_names))
+    if unique_character_names:
         char_entities = (
             supabase_client.table("entities")
             .select("id")
             .eq("project_id", project_id)
             .eq("entity_type", "CHARACTER")
-            .in_("name", character_names[:5])
+            .in_("name", unique_character_names[:5])
             .execute()
         )
         for row in char_entities.data or []:

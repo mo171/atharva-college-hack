@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import {
   Bold,
   Italic,
@@ -29,26 +29,43 @@ function EditorContent({
 }) {
   const debounceRef = useRef(null);
   const lastContentRef = useRef("");
+  const [editorText, setEditorText] = useState("");
+  const [syncStatus, setSyncStatus] = useState("Idle");
+
+  const wordCount = useMemo(() => {
+    const words = editorText.trim().split(/\s+/).filter(Boolean);
+    return words.length;
+  }, [editorText]);
+
+  const readingMinutes = useMemo(() => {
+    if (!wordCount) return 0;
+    return Math.max(1, Math.ceil(wordCount / 200));
+  }, [wordCount]);
 
   const handleContentChange = useCallback(
     (text) => {
       if (!projectId || !text?.trim()) return;
       lastContentRef.current = text;
+      setEditorText(text);
+      setSyncStatus("Typing...");
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(async () => {
         debounceRef.current = null;
         try {
+          setSyncStatus("Analyzing...");
           const payload = await analyzeWriting({
             projectId,
             content: lastContentRef.current,
           });
           onAnalysis?.(payload);
           onStoryBrainRefresh?.();
+          setSyncStatus("Synced");
         } catch (err) {
           console.error("Analysis failed:", err);
+          setSyncStatus("Sync error");
         }
-      }, 800);
+      }, 900);
     },
     [projectId, onAnalysis, onStoryBrainRefresh]
   );
@@ -118,11 +135,13 @@ function EditorContent({
         <div className="mb-8 flex gap-6 text-xs text-[#888]">
           <span className="flex items-center gap-1.5">
             <FileText className="h-3.5 w-3.5" />
-            1,240 words
+            {wordCount.toLocaleString()} words
           </span>
           <span className="flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5" />6 min read
+            <Clock className="h-3.5 w-3.5" />
+            {readingMinutes} min read
           </span>
+          <span>{alerts.length} active alerts</span>
         </div>
 
         {/* Chapter body */}
@@ -134,7 +153,7 @@ function EditorContent({
         <div className="mt-12 flex flex-wrap gap-2 text-[11px] text-[#888]">
           <span>DRAFT 0.4.2</span>
           <span>•</span>
-          <span>SYNC: COMPLETE</span>
+          <span>SYNC: {syncStatus.toUpperCase()}</span>
           <span>•</span>
           <span>READING LEVEL: GRADE 9</span>
           <span>•</span>

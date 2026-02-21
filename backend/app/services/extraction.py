@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from importlib import import_module
 from importlib.util import find_spec
 
@@ -121,6 +122,14 @@ def build_nlp_pipeline(model_name: str = "en_core_web_sm", enable_coref: bool = 
         nlp.add_pipe("fastcoref", last=True)
 
     return nlp
+
+
+@lru_cache(maxsize=2)
+def get_cached_nlp_pipeline(
+    model_name: str = "en_core_web_sm", enable_coref: bool = False
+) -> Language:
+    """Return a cached spaCy pipeline to avoid rebuilding it on every request."""
+    return build_nlp_pipeline(model_name=model_name, enable_coref=enable_coref)
 
 
 def extract_named_entities(doc: Doc) -> list[dict[str, str]]:
