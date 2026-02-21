@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
@@ -25,15 +25,20 @@ class WriteRequest(BaseModel):
     )
 
 
+class SaveRequest(BaseModel):
+    project_id: str = Field(..., example="uuid-123-project")
+    content: str = Field(..., example="Draft content...")
+
+
 class EntityResponse(BaseModel):
     name: str
-    type: str
 
 
 class AlertResponse(BaseModel):
     type: str  # e.g., 'INCONSISTENCY', 'POV_SHIFT'
     entity: Optional[str]
     explanation: str
+    original_text: Optional[str] = None
 
 
 class AnalysisResponse(BaseModel):
@@ -103,7 +108,12 @@ async def run_analysis(project_id: str, text_content: str) -> dict:
         {"name": e["text"], "type": e.get("label", "OBJECT")} for e in result.entities
     ]
     alerts_out = [
-        {"type": "INCONSISTENCY", "entity": None, "explanation": item["alert"]}
+        {
+            "type": "INCONSISTENCY",
+            "entity": None,
+            "explanation": item["alert"],
+            "original_text": item.get("original_text"),
+        }
         for item in alerts_data
     ]
     detected_actions = [
@@ -128,23 +138,18 @@ async def run_analysis(project_id: str, text_content: str) -> dict:
 # --- ROUTES ---
 
 
-@router.post("/analyze", response_model=AnalysisResponse)
-async def analyze_writing(request: WriteRequest, background_tasks: BackgroundTasks):
+@router.post("/save")
+async def save_draft(request: SaveRequest):
     """
-    Saves narrative chunk immediately.
-    Runs heavy NLP extraction/KG update/inconsistency logs as a background task
-    if content length > THRESHOLD.
+    Saves narrative chunk immediately for persistence without
+    triggering NLP analysis.
     """
-    THRESHOLD = 500
-
     try:
         content = request.content
         project_id = request.project_id
 
-        # 1. Immediate Persistence (Fast path)
         embedding = None
         try:
-            # We still try embedding synchronously for search relevance if fast
             embedding = get_embedding(content)
         except Exception:
             pass
@@ -152,25 +157,21 @@ async def analyze_writing(request: WriteRequest, background_tasks: BackgroundTas
         store = ExtractionStore(project_id=project_id, supabase_client=supabase_client)
         store.insert_narrative_chunk(content=content, embedding=embedding)
 
-        # 2. Conditional Heavier Analysis (Sync/Asymmetric path)
-        if len(content) < THRESHOLD:
-            return {
-                "status": "partial_success",
-                "entities": [],
-                "alerts": [],
-                "resolved_context": content,
-                "detected_actions": [],
-            }
+        return {"status": "saved", "project_id": project_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-        # For long chunks, run the full pipeline in the background
-        # Note: AnalysisResponse expects a return immediately.
-        # To truly wow the user, we run it sync for the first response
-        # OR return dummy and let websockets/polling catch up.
-        # User requested: "start processing in backend like asynchronous sync... at least 100 lines"
-        # We will run it synchronously for now to satisfy the return type, but
-        # we've satisfied the "don't process small bits" requirement.
 
-        return await run_analysis(project_id=project_id, text_content=content)
+@router.post("/analyze", response_model=AnalysisResponse)
+async def analyze_writing(request: WriteRequest):
+    """
+    Manual trigger for full narrative analysis.
+    Runs extraction, persists KG/entities, and returns alerts/entities.
+    """
+    try:
+        return await run_analysis(
+            project_id=request.project_id, text_content=request.content
+        )
     except Exception as e:
         print(f"CRITICAL ERROR in /editor/analyze: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Narrative Engine Error: {str(e)}")

@@ -38,6 +38,7 @@ const SIDEBAR_ITEMS = [
 function StoryBrainSidebar({
   projectId,
   entities = [],
+  activeEntityNames = [],
   recentHistory = [],
   onStoryBrainUpdate,
   className,
@@ -45,10 +46,18 @@ function StoryBrainSidebar({
 }) {
   const [refreshingId, setRefreshingId] = useState(null);
 
-  const characters = entities.filter((e) => e.entity_type === "CHARACTER");
-  const locations = entities.filter((e) => e.entity_type === "LOCATION");
-  const firstChar = characters[0];
-  const firstLoc = locations[0];
+  const allCharacters = entities.filter((e) => e.entity_type === "CHARACTER");
+  const allLocations = entities.filter((e) => e.entity_type === "LOCATION");
+
+  const hasActiveFilter = activeEntityNames && activeEntityNames.length > 0;
+
+  const characters = hasActiveFilter
+    ? allCharacters.filter((c) => activeEntityNames.includes(c.name))
+    : allCharacters;
+
+  const locations = hasActiveFilter
+    ? allLocations.filter((l) => activeEntityNames.includes(l.name))
+    : allLocations;
 
   const handleRefreshSummary = async (entityId) => {
     if (!projectId || !entityId || !onStoryBrainUpdate) return;
@@ -106,7 +115,7 @@ function StoryBrainSidebar({
 
       <div className="space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[#2e2e2e]">
-          Active Context
+          {hasActiveFilter ? "Active Context" : "Project Overview"}
         </h3>
         <div className="space-y-3">
           {characters.length > 0 &&

@@ -1,4 +1,4 @@
-import { api } from './axios'
+import { api } from "./axios";
 
 /**
  * Create a new story brain project.
@@ -14,7 +14,7 @@ export async function createStoryBrain({
   characters,
   worldSetting,
 }) {
-  const { data } = await api.post('/projects/setup', {
+  const { data } = await api.post("/projects/setup", {
     user_id: userId,
     title,
     genre,
@@ -22,11 +22,11 @@ export async function createStoryBrain({
     tone,
     characters: (characters || []).map((c) => ({
       name: c.name,
-      description: c.description ?? '',
+      description: c.description ?? "",
     })),
-    world_setting: worldSetting ?? '',
-  })
-  return data
+    world_setting: worldSetting ?? "",
+  });
+  return data;
 }
 
 /**
@@ -35,11 +35,24 @@ export async function createStoryBrain({
  * @returns {Promise<{ status: string, entities: Array, alerts: Array, resolved_context: string, detected_actions: Array }>}
  */
 export async function analyzeWriting({ projectId, content }) {
-  const { data } = await api.post('/editor/analyze', {
+  const { data } = await api.post("/editor/analyze", {
     project_id: projectId,
     content,
-  })
-  return data
+  });
+  return data;
+}
+
+/**
+ * Save writing content for a project (persistence only, no analysis).
+ * @param {{ projectId: string, content: string }}
+ * @returns {Promise<{ status: string, project_id: string }>}
+ */
+export async function saveWriting({ projectId, content }) {
+  const { data } = await api.post("/editor/save", {
+    project_id: projectId,
+    content,
+  });
+  return data;
 }
 
 /**
@@ -48,8 +61,8 @@ export async function analyzeWriting({ projectId, content }) {
  * @returns {Promise<{ entities: Array, recent_history: Array }>}
  */
 export async function fetchStoryBrain(projectId) {
-  const { data } = await api.get(`/editor/story-brain/${projectId}`)
-  return data
+  const { data } = await api.get(`/editor/story-brain/${projectId}`);
+  return data;
 }
 
 /**
@@ -60,9 +73,9 @@ export async function fetchStoryBrain(projectId) {
 export async function updateEntityMetadata({ entityId, metadataPatch }) {
   const { data } = await api.post(
     `/editor/update-entity?entity_id=${encodeURIComponent(entityId)}`,
-    metadataPatch
-  )
-  return data
+    metadataPatch,
+  );
+  return data;
 }
 
 /**
@@ -71,9 +84,9 @@ export async function updateEntityMetadata({ entityId, metadataPatch }) {
  * @returns {Promise<{ status: string, metadata: Record<string, unknown> }>}
  */
 export async function refreshCharacterSummary({ projectId, entityId }) {
-  const { data } = await api.post('/editor/refresh-character-summary', {
+  const { data } = await api.post("/editor/refresh-character-summary", {
     project_id: projectId,
     entity_id: entityId,
-  })
-  return data
+  });
+  return data;
 }

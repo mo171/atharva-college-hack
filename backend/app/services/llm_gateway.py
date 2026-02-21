@@ -38,7 +38,11 @@ class InsightGenerator:
 
     @staticmethod
     def _build_prompt(conflict: ConflictInput, max_words: int) -> str:
-        existing = ", ".join(conflict.existing_objects) if conflict.existing_objects else "none"
+        existing = (
+            ", ".join(conflict.existing_objects)
+            if conflict.existing_objects
+            else "none"
+        )
         return (
             "You are an editorial assistant for fiction writers. "
             "Write one concise alert that points out continuity problems. "
@@ -54,7 +58,9 @@ class InsightGenerator:
             "3) Return only the alert sentence, no bullets or metadata."
         )
 
-    def generate_conflict_alert(self, conflict: ConflictInput, max_words: int = 10) -> str:
+    def generate_conflict_alert(
+        self, conflict: ConflictInput, max_words: int = 10
+    ) -> str:
         """Generate a short alert sentence for a detected story inconsistency."""
         prompt = self._build_prompt(conflict, max_words=max_words)
 
@@ -96,7 +102,7 @@ class SupabaseInsightService:
         relation = "RELATED_TO"
         object_value = "UNKNOWN_OBJECT"
 
-        match = re.search(r"Inconsistency for \((.?), (.?), (.*?)\)", explanation)
+        match = re.search(r"Inconsistency for \((.*?), (.*?), (.*?)\)", explanation)
         if match:
             subject = match.group(1).strip()
             relation = match.group(2).strip()
@@ -108,7 +114,11 @@ class SupabaseInsightService:
             tail = explanation.split(marker, 1)[1].strip().strip(".")
             tail = tail.strip("[]")
             if tail:
-                existing_objects = [item.strip().strip("'\"") for item in tail.split(",") if item.strip()]
+                existing_objects = [
+                    item.strip().strip("'\"")
+                    for item in tail.split(",")
+                    if item.strip()
+                ]
 
         return ConflictInput(
             subject=subject,
@@ -121,7 +131,9 @@ class SupabaseInsightService:
         """Get pending INCONSISTENCY logs for this project."""
         response = (
             self.supabase.table("consistency_logs")
-            .select("id,project_id,issue_type,status,explanation,suggested_fix,original_text")
+            .select(
+                "id,project_id,issue_type,status,explanation,suggested_fix,original_text"
+            )
             .eq("project_id", self.project_id)
             .eq("issue_type", "INCONSISTENCY")
             .eq("status", "PENDING")
@@ -131,13 +143,21 @@ class SupabaseInsightService:
         )
         return response.data or []
 
-    def generate_and_store_alert(self, log_id: str, conflict: ConflictInput, max_words: int = 10) -> str:
+    def generate_and_store_alert(
+        self, log_id: str, conflict: ConflictInput, max_words: int = 10
+    ) -> str:
         """Generate alert and store in suggested_fix on consistency_logs row."""
-        alert = self.generator.generate_conflict_alert(conflict=conflict, max_words=max_words)
-        self.supabase.table("consistency_logs").update({"suggested_fix": alert}).eq("id", log_id).execute()
+        alert = self.generator.generate_conflict_alert(
+            conflict=conflict, max_words=max_words
+        )
+        self.supabase.table("consistency_logs").update({"suggested_fix": alert}).eq(
+            "id", log_id
+        ).execute()
         return alert
 
-    def process_pending_logs(self, max_words: int = 10, limit: int = 50) -> list[dict[str, str]]:
+    def process_pending_logs(
+        self, max_words: int = 10, limit: int = 50
+    ) -> list[dict[str, str]]:
         """Generate and persist alerts for pending inconsistency logs."""
         rows = self.fetch_pending_inconsistency_logs(limit=limit)
         results: list[dict[str, str]] = []
@@ -149,7 +169,13 @@ class SupabaseInsightService:
                 conflict=conflict,
                 max_words=max_words,
             )
-            results.append({"log_id": row["id"], "alert": alert})
+            results.append(
+                {
+                    "log_id": row["id"],
+                    "alert": alert,
+                    "original_text": row.get("original_text"),
+                }
+            )
 
         return results
 
@@ -197,10 +223,14 @@ def generate_and_store_alert_for_log(
         object=object_value,
         existing_objects=existing_objects,
     )
-    return service.generate_and_store_alert(log_id=log_id, conflict=conflict, max_words=max_words)
+    return service.generate_and_store_alert(
+        log_id=log_id, conflict=conflict, max_words=max_words
+    )
 
 
-def get_embedding(text: str, api_key: str | None = None, model: str = "text-embedding-3-small") -> list[float]:
+def get_embedding(
+    text: str, api_key: str | None = None, model: str = "text-embedding-3-small"
+) -> list[float]:
     """Return embedding vector for text. Used by project_setup and extraction persist flow."""
     key = api_key or os.environ.get("OPENAI_API_KEY")
     if not key:

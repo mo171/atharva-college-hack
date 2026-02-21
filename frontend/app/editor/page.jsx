@@ -22,6 +22,7 @@ function EditorPageContent() {
     recentHistory: [],
   });
   const [alerts, setAlerts] = useState([]);
+  const [activeEntityNames, setActiveEntityNames] = useState([]);
 
   useEffect(() => {
     if (!projectId) {
@@ -65,6 +66,7 @@ function EditorPageContent() {
           className="hidden lg:flex"
           projectId={projectId}
           entities={storyBrain.entities}
+          activeEntityNames={activeEntityNames}
           recentHistory={storyBrain.recentHistory}
           onStoryBrainUpdate={setStoryBrain}
         />
@@ -73,6 +75,10 @@ function EditorPageContent() {
           alerts={alerts}
           onAnalysis={(payload) => {
             setAlerts(payload?.alerts ?? []);
+            if (payload?.entities) {
+              const names = payload.entities.map((e) => e.name);
+              setActiveEntityNames(names);
+            }
           }}
           onStoryBrainRefresh={() => {
             if (projectId) {
@@ -80,15 +86,12 @@ function EditorPageContent() {
                 setStoryBrain({
                   entities: data.entities ?? [],
                   recentHistory: data.recent_history ?? [],
-                })
+                }),
               );
             }
           }}
         />
-        <AIInsightsSidebar
-          className="hidden xl:flex"
-          alerts={alerts}
-        />
+        <AIInsightsSidebar className="hidden xl:flex" alerts={alerts} />
       </div>
     </div>
   );
@@ -96,7 +99,13 @@ function EditorPageContent() {
 
 export default function EditorPage() {
   return (
-    <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
       <EditorPageContent />
     </Suspense>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import {
   Bold,
   Italic,
@@ -12,12 +12,13 @@ import {
   User,
   FileText,
   Clock,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/app/components/ui/button";
 import { EditorContainer } from "@/features/editor";
 import { cn } from "@/lib/utils";
-import { analyzeWriting } from "@/lib/api";
+import { analyzeWriting, saveWriting } from "@/lib/api";
 
 function EditorContent({
   projectId,
@@ -29,6 +30,7 @@ function EditorContent({
 }) {
   const debounceRef = useRef(null);
   const lastContentRef = useRef("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleContentChange = useCallback(
     (text) => {
@@ -39,19 +41,37 @@ function EditorContent({
       debounceRef.current = setTimeout(async () => {
         debounceRef.current = null;
         try {
-          const payload = await analyzeWriting({
+          // Auto-save only, no analysis
+          await saveWriting({
             projectId,
             content: lastContentRef.current,
           });
-          onAnalysis?.(payload);
           onStoryBrainRefresh?.();
         } catch (err) {
-          console.error("Analysis failed:", err);
+          console.error("Auto-save failed:", err);
         }
-      }, 800);
+      }, 2000); // 2 second debounce for auto-save
     },
-    [projectId, onAnalysis, onStoryBrainRefresh]
+    [projectId, onStoryBrainRefresh],
   );
+
+  const handleManualAnalyze = async () => {
+    if (!projectId || !lastContentRef.current.trim() || isAnalyzing) return;
+
+    setIsAnalyzing(true);
+    try {
+      const payload = await analyzeWriting({
+        projectId,
+        content: lastContentRef.current,
+      });
+      onAnalysis?.(payload);
+      onStoryBrainRefresh?.();
+    } catch (err) {
+      console.error("Manual analysis failed:", err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -96,6 +116,21 @@ function EditorContent({
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <List className="h-4 w-4" />
           </Button>
+          <Button
+            onClick={handleManualAnalyze}
+            disabled={isAnalyzing}
+            className={cn(
+              "gap-2 rounded-xl px-4 py-2 text-sm transition-all",
+              isAnalyzing
+                ? "bg-[#e8ecff] text-[#888]"
+                : "bg-[#5a5fd8] text-white hover:bg-[#4a4fcf] shadow-md shadow-[#5a5fd8]/20",
+            )}
+          >
+            <Zap
+              className={cn("h-3.5 w-3.5", isAnalyzing && "animate-pulse")}
+            />
+            {isAnalyzing ? "ANALYZING..." : "ANALYZE"}
+          </Button>
           <div className="h-4 w-px bg-[#e8e8e0]" />
           <Button className="gap-2 rounded-xl bg-[#ced3ff] px-4 py-2 text-sm text-[#4a4a7a] transition-colors hover:bg-[#b8bff5]">
             <User className="h-3.5 w-3.5" />
@@ -127,7 +162,10 @@ function EditorContent({
 
         {/* Chapter body */}
         <div className="space-y-4 text-[15px] leading-relaxed text-[#2e2e2e]">
-          <EditorContainer onContentChange={handleContentChange} />
+          <EditorContainer
+            onContentChange={handleContentChange}
+            alerts={alerts}
+          />
         </div>
 
         {/* Footer */}
