@@ -181,4 +181,77 @@
     scrollbar-width: thin;
     scrollbar-color: #cacfd2 transparent;
   }
+
+  /* --- INSIGHT HIGHLIGHTS --- */
+  .insight-highlight {
+    position: relative;
+    border-radius: 2px;
+    padding: 0 1px;
+    cursor: help;
+    transition: all 0.2s ease;
+  }
+
+  .insight-highlight:hover {
+    filter: brightness(0.95);
+  }
+
+  /* Spelling - Red */
+  .insight-highlight-spelling {
+    background-color: #fee2e2;
+    border-bottom: 2px solid #ef4444;
+  }
+
+  /* Grammar - Blue */
+  .insight-highlight-grammar {
+    background-color: #dbeafe;
+    border-bottom: 2px solid #3b82f6;
+  }
+
+  /* Style - Yellow */
+  .insight-highlight-style {
+    background-color: #fef3c7;
+    border-bottom: 2px solid #f59e0b;
+  }
+
+  /* Inconsistency - Purple */
+  .insight-highlight-inconsistency {
+    background-color: #f3e8ff;
+    border-bottom: 2px solid #a855f7;
+  }
+
+  /* Tone - Green */
+  .insight-highlight-tone {
+    background-color: #e0ffe3;
+    border-bottom: 2px solid #22c55e;
+  }
+
+  /* Tooltip logic */
+  .insight-highlight[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+    background: #1e1e2e;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: pre-wrap;
+    width: max-content;
+    max-width: 200px;
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    line-height: 1.4;
+    text-align: left;
+    font-style: normal;
+  }
+
+  .insight-highlight[data-tooltip]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-4px);
+  }
 }

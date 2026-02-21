@@ -6,7 +6,7 @@ import { getGhostSuggestion } from "@/lib/api";
 
 import { EditorCanvas } from "../components/EditorCanvas";
 
-const DEFAULT_HTML = `<p>Elias descended the worn stone steps, the smell of dried herbs and decay thickening with each step. The apothecary's cellar had always felt like a threshold between worlds—half laboratory, half crypt.</p><p><span style="text-decoration: underline; text-decoration-color: #cff8ff; text-underline-offset: 2px;">He remembered the sunlit garden outside, a stark contrast to the darkness he now inhabited.</span> The memory felt distant, almost belonging to another man.</p><p><span style="border-radius: 4px; background-color: #fff5e1; padding: 0 2px;">He stood up and looked around the room, wondering where the potion could have gone.</span> The shelves were lined with amber bottles, their labels faded beyond recognition. None of them resembled what he had come for.</p><p>A faint draft stirred the dust. Elias turned, but the shadows yielded nothing. The silence was total—the kind of silence that seemed to listen.</p>`;
+const DEFAULT_HTML = `<p>Elias descended the worn stone steps, the smell of dried herbs and decay thickening with each step. The apothecary's cellar had always felt like a threshold between worlds—half laboratory, half crypt.</p><p><span class="insight-highlight insight-highlight-grammar" data-tooltip="This sentence has a complex structure. Consider shortening it for better flow.">He remembered the sunlit garden outside, a stark contrast to the darkness he now inhabited.</span> The memory felt distant, almost belonging to another man.</p><p><span class="insight-highlight insight-highlight-style" data-tooltip="This action feels abrupt. You might want to describe Elias's physical reaction to the draft.">He stood up and looked around the room, wondering where the potion could have gone.</span> The shelves were lined with amber bottles, their labels faded beyond recognition. None of them resembled what he had come for.</p><p>A faint draft stirred the dust. Elias turned, but the shadows yielded <span class="insight-highlight insight-highlight-spelling" data-tooltip="Possible typo: 'nothin'. Did you mean: nothing, notion, north?">nothin</span>. The silence was total—the kind of silence that seemed to listen.</p>`;
 
 function EditorContainer({ onContentChange, alerts, className, ...props }) {
   const editorRef = useRef(null);
@@ -93,21 +93,41 @@ function EditorContainer({ onContentChange, alerts, className, ...props }) {
     let html = el.innerHTML;
     let modified = false;
 
+    // Helper to map alert types to CSS classes
+    const getHighlightClass = (type) => {
+      switch (type?.toUpperCase()) {
+        case "SPELLING":
+          return "insight-highlight-spelling";
+        case "GRAMMAR":
+          return "insight-highlight-grammar";
+        case "STYLE":
+          return "insight-highlight-style";
+        case "INCONSISTENCY":
+          return "insight-highlight-inconsistency";
+        default:
+          return "insight-highlight-style";
+      }
+    };
+
     alerts.forEach((alert) => {
-      if (alert.original_text && alert.type === "INCONSISTENCY") {
-        // Prevent infinite loops or redundant wrapping
+      if (alert.original_text) {
+        // Prevent redundant wrapping
         if (
           html.includes(alert.original_text) &&
-          !html.includes(`data-alert-text="${alert.original_text}"`)
+          !html.includes(`data-insight-id`)
         ) {
           const escapedText = alert.original_text.replace(
             /[.*+?^${}()|[\]\\]/g,
             "\\$&",
           );
-          const regex = new RegExp(escapedText, "g");
+          const regex = new RegExp(`(?<!<[^>]*)${escapedText}(?![^<]*>)`, "g"); // Avoid wrapping text inside tags
+
+          const highlightClass = getHighlightClass(alert.type);
+          const tooltipText = alert.explanation;
+
           html = html.replace(
             regex,
-            `<span class="inconsistency-highlight" data-alert-text="${alert.original_text}" style="background-color: rgba(255, 230, 230, 1); border-bottom: 2px solid #ff4d4d; border-radius: 2px; cursor: help;" title="${alert.explanation}">${alert.original_text}</span>`,
+            `<span class="insight-highlight ${highlightClass}" data-insight-id="${Math.random().toString(36).substr(2, 9)}" data-tooltip="${tooltipText.replace(/"/g, "&quot;")}">${alert.original_text}</span>`,
           );
           modified = true;
         }
@@ -115,8 +135,6 @@ function EditorContainer({ onContentChange, alerts, className, ...props }) {
     });
 
     if (modified) {
-      // Save cursor position if possible or just update
-      // For this demo, we update. In production, use a state-managed editor.
       el.innerHTML = html;
     }
   }, [alerts]);
