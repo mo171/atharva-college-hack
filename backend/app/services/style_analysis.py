@@ -1,32 +1,34 @@
 import numpy as np
 import spacy
 from collections import Counter
-from sentence_transformers import SentenceTransformer
 from transformers import pipeline
 import fitz  # PyMuPDF
 import re
+from typing import Dict, Any, List
 
 # =========================================================
-# MODELS (Lazy Load Singleton Pattern)
+# MODELS (Singleton Pattern for Hackathon Efficiency)
 # =========================================================
-
 
 class StyleModels:
     _instance = None
 
     def __init__(self):
-        print("Loading Meso (Flow) Models...")
-        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        print("🚀 Loading High-Fidelity Style Models...")
+        # For detecting the "Vibe"
         self.emotion_classifier = pipeline(
             "text-classification",
             model="j-hartmann/emotion-english-distilroberta-base",
-            return_all_scores=True,
+            top_k=None
         )
+        # For detecting the "Genre"
         self.genre_classifier = pipeline(
-            "zero-shot-classification", model="facebook/bart-large-mnli"
+            "zero-shot-classification", 
+            model="facebook/bart-large-mnli"
         )
+        # For linguistic structure
         self.nlp = spacy.load("en_core_web_sm")
-        print("Meso Models loaded.")
+        print("✅ Style Models Ready.")
 
     @classmethod
     def get_instance(cls):
@@ -34,81 +36,78 @@ class StyleModels:
             cls._instance = cls()
         return cls._instance
 
-
 # =========================================================
-# CORE ANALYSIS LOGIC
+# HELPER UTILITIES
 # =========================================================
-
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """Extract text from PDF bytes using PyMuPDF."""
+    """Converts uploaded manuscript PDFs into clean text."""
     doc = fitz.open(stream=file_bytes, filetype="pdf")
-    text = ""
-    for page in doc:
-        text += page.get_text()
+    text = "".join([page.get_text() for page in doc])
     return text
 
+def _generate_style_description(avg_len: float, richness: float) -> str:
+    """Converts raw data into human-readable editorial feedback."""
+    desc = []
+    if avg_len > 22: desc.append("Prose is expansive and complex.")
+    elif avg_len < 12: desc.append("Prose is punchy, minimalist, and fast-paced.")
+    else: desc.append("Prose follows a balanced, rhythmic structure.")
 
-def analyze_writer_style(text: str):
+    if richness > 0.5: desc.append("Vocabulary is diverse and sophisticated.")
+    else: desc.append("Language is grounded and direct.")
+    
+    return " ".join(desc)
+
+# =========================================================
+# CORE STYLE ANALYSIS ENGINE
+# =========================================================
+
+def analyze_writer_style(text: str) -> Dict[str, Any]:
+    """
+    Analyzes a writing sample to extract a 'Style Blueprint'.
+    This DNA is then used to prevent the AI from giving generic 'footsteps' suggestions.
+    """
     models = StyleModels.get_instance()
+    
+    # 1. Linguistic DNA Extraction (spaCy)
+    doc = models.nlp(text[:15000]) # Sample limit for performance
+    
+    # Extract real sentences as 'Anchors' for Few-Shot prompting
+    # We look for medium-length sentences that are complete thoughts
+    sentences = [s.text.strip() for s in doc.sents if 10 < len(s.text.split()) < 25]
+    style_anchors = sentences[:5] 
 
-    # 1. Genre
-    candidate_labels = [
-        "horror",
-        "fantasy",
-        "science fiction",
-        "romance",
-        "thriller",
-        "literary",
-        "mystery",
-    ]
-    genre_res = models.genre_classifier(text[:2000], candidate_labels)
-    genres = dict(zip(genre_res["labels"], genre_res["scores"]))
+    # Extract Vocabulary Fingerprints (Favorite adjectives and verbs)
+    vocab_favors = [token.lemma_.lower() for token in doc 
+                    if token.pos_ in ["ADJ", "ADV", "VERB"] and not token.is_stop and token.is_alpha]
+    top_vocab = [word for word, count in Counter(vocab_favors).most_common(12)]
 
-    # 2. Emotions
-    chunks = [text[i : i + 500] for i in range(0, min(len(text), 5000), 500)]
-    emotion_totals = Counter()
-    for chunk in chunks:
-        output = models.emotion_classifier(chunk)
-        results = output[0] if isinstance(output[0], list) else output
-        for r in results:
-            emotion_totals[r["label"]] += float(r["score"])
-
-    total = sum(emotion_totals.values())
-    emotions = {k: v / total for k, v in emotion_totals.items()} if total > 0 else {}
-
-    # 3. Structural Style
-    doc = models.nlp(text[:10000])
+    # 2. Structure Math
     sent_lens = [len(sent.text.split()) for sent in doc.sents]
     avg_len = np.mean(sent_lens) if sent_lens else 0
+    richness = len(set(t.lower_ for t in doc if t.is_alpha)) / len(doc) if len(doc) > 0 else 0
 
-    vocab = set([token.lemma_.lower() for token in doc if token.is_alpha])
-    richness = len(vocab) / len([t for t in doc if t.is_alpha]) if len(doc) > 0 else 0
+    # 3. Atmosphere & Genre (Hugging Face)
+    # Analyze middle chunk to avoid 'Chapter 1' title bias
+    sample_chunk = text[1000:3000] if len(text) > 3000 else text
+    
+    # Genre Detection
+    genre_labels = ["horror", "fantasy", "noir", "romance", "thriller", "literary"]
+    genre_res = models.genre_classifier(sample_chunk, genre_labels)
+    
+    # Emotion Detection
+    emotion_res = models.emotion_classifier(sample_chunk[:512])[0]
+    dominant_emotion = max(emotion_res, key=lambda x: x['score'])['label']
 
-    # 4. Interpretations (The Blueprint)
+    # 4. FINAL BLUEPRINT CONSTRUCTION
     style_blueprint = {
-        "genre": max(genres, key=genres.get) if genres else "Unknown",
-        "dominant_emotion": max(emotions, key=emotions.get) if emotions else "Neutral",
-        "avg_sentence_length": float(avg_len),
-        "vocab_richness": float(richness),
+        "dominant_genre": genre_res["labels"][0],
+        "dominant_emotion": dominant_emotion.capitalize(),
+        "avg_sentence_length": round(float(avg_len), 2),
+        "vocab_richness": round(float(richness), 2),
         "description": _generate_style_description(avg_len, richness),
+        "style_anchors": style_anchors,  # These go directly into Suggestion Prompt
+        "top_vocabulary": top_vocab      # These guide word choice
     }
 
     return style_blueprint
-
-
-def _generate_style_description(avg_len, richness):
-    desc = []
-    if avg_len > 18:
-        desc.append("Sentences are long and immersive.")
-    elif avg_len < 12:
-        desc.append("Sentences are short and punchy.")
-    else:
-        desc.append("Sentence length is balanced.")
-
-    if richness > 0.45:
-        desc.append("Vocabulary is diverse and expressive.")
-    else:
-        desc.append("Language is simple and direct.")
-
-    return " ".join(desc)

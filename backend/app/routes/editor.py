@@ -272,8 +272,8 @@ async def manual_entity_update(entity_id: str, metadata_patch: Dict[str, Any]):
 @router.post("/suggest")
 async def get_editing_suggestion(request: SuggestionRequest):
     """
-    Generate a Ghost Text suggestion based on the last 200 words
-    and the project's style blueprint.
+    Generate a Ghost Text suggestion based on context, style,
+    narrative history, and knowledge graph facts.
     """
     try:
         # 1. Fetch style blueprint
@@ -284,16 +284,37 @@ async def get_editing_suggestion(request: SuggestionRequest):
             .single()
             .execute()
         )
-
         blueprint = project.data.get("style_blueprint") if project.data else {}
 
-        # 2. Get suggestion
+        # 2. Fetch Narrative History (last 3 chunks)
+        history_resp = (
+            supabase_client.table("narrative_chunks")
+            .select("content")
+            .eq("project_id", request.project_id)
+            .order("chunk_index", desc=True)
+            .limit(3)
+            .execute()
+        )
+        history = [row["content"] for row in reversed(history_resp.data or [])]
+
+        # 3. Fetch Knowledge Graph Facts (relationships)
+        kg = StoryKnowledgeGraph.from_supabase(
+            project_id=request.project_id, supabase_client=supabase_client
+        )
+        graph_facts = []
+        for u, v, data in kg.graph.edges(data=True):
+            graph_facts.append(f"{u} {data.get('relation', 'is related to')} {v}")
+
+        # 4. Get suggestion
         service = get_suggestion_service()
         suggestion = service.get_ghost_suggestion(
-            context_text=request.content, blueprint=blueprint
+            context_text=request.content,
+            blueprint=blueprint,
+            history=history,
+            graph_facts=graph_facts[:15],  # Limit to avoid token bloat
         )
 
         return {"status": "success", "suggestion": suggestion}
     except Exception as e:
-        print(f"Ghost Text Error: {e}")
+        print(f"Graph-Aware Ghost Text Error: {e}")
         return {"status": "error", "suggestion": ""}

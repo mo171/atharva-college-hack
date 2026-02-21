@@ -12,15 +12,8 @@ pytest
 pyspellchecker
 sentence-transformers
 transformers
-spacy
 torch
 numpy
 pymupdf
 scikit-learn
-sentence-transformers
-transformers
-spacy
-torch
-numpy
-pymupdf
-scikit-learn
+python-multipart
