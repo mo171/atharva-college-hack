@@ -15,14 +15,21 @@ using in-memory fakes for Supabase and the LLM so that it does not
 depend on external services being available.
 """
 
+import sys
+from pathlib import Path
+
+# Add the 'app' directory to sys.path to support local imports within 'app'
+app_dir = Path(__file__).resolve().parent / "app"
+sys.path.append(str(app_dir))
+
 from fastapi.testclient import TestClient
 
-from app.app import app
-from app.routes import project as project_routes
-from app.routes import editor as editor_routes
-from app.services import analysis as analysis_service
-from app.services import project_setup as project_setup_service
-from app.services import llm_gateway as llm_gateway_service
+import app as fastapi_module  # This will find app.py since 'app/' is in sys.path
+from routes import project as project_routes
+from routes import editor as editor_routes
+from services import analysis as analysis_service
+from services import project_setup as project_setup_service
+from services import llm_gateway as llm_gateway_service
 
 
 class FakeTable:
@@ -87,7 +94,7 @@ def run_smoke_tests() -> None:
     project_setup_service.llm = fake_llm
     llm_gateway_service.llm = fake_llm
 
-    client = TestClient(app)
+    client = TestClient(fastapi_module.app)
 
     # 1. Health
     health = client.get("/health")
@@ -124,4 +131,3 @@ def run_smoke_tests() -> None:
 
 if __name__ == "__main__":
     run_smoke_tests()
-

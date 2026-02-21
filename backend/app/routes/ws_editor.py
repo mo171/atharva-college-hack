@@ -2,7 +2,7 @@ import json
 
 from fastapi import APIRouter, WebSocket
 
-from app.routes.editor import run_analysis
+from routes.editor import run_analysis
 
 router = APIRouter(tags=["WebSocket Editor"])
 

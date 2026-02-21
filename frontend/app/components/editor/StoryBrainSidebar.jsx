@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Users, TrendingUp, MapPin, GitBranch, ChevronRight, RefreshCw } from "lucide-react";
+import {
+  Users,
+  TrendingUp,
+  MapPin,
+  GitBranch,
+  ChevronRight,
+  RefreshCw,
+} from "lucide-react";
 
 import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
@@ -18,7 +25,7 @@ const sidebarItemVariants = cva(
       },
     },
     defaultVariants: { variant: "default" },
-  }
+  },
 );
 
 const SIDEBAR_ITEMS = [
@@ -47,10 +54,13 @@ function StoryBrainSidebar({
     if (!projectId || !entityId || !onStoryBrainUpdate) return;
     setRefreshingId(entityId);
     try {
-      const { metadata } = await refreshCharacterSummary({ projectId, entityId });
+      const { metadata } = await refreshCharacterSummary({
+        projectId,
+        entityId,
+      });
       onStoryBrainUpdate((prev) => ({
         entities: (prev.entities ?? []).map((e) =>
-          e.id === entityId ? { ...e, metadata } : e
+          e.id === entityId ? { ...e, metadata } : e,
         ),
         recentHistory: prev.recentHistory ?? [],
       }));
@@ -65,7 +75,7 @@ function StoryBrainSidebar({
     <aside
       className={cn(
         "flex w-64 shrink-0 flex-col gap-6 border-r border-[#e8e8e0] bg-[#f8f7ff] p-4",
-        className
+        className,
       )}
       {...props}
     >
@@ -99,48 +109,60 @@ function StoryBrainSidebar({
           Active Context
         </h3>
         <div className="space-y-3">
-          {firstChar && (
-            <div className="rounded-xl border border-[#e8e8e0] bg-[#e0ffe3]/60 p-3 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] uppercase tracking-wider text-[#666]">
-                  Character
+          {characters.length > 0 &&
+            characters.map((char) => (
+              <div
+                key={char.id}
+                className="rounded-xl border border-[#e8e8e0] bg-[#e0ffe3]/60 p-3 shadow-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] uppercase tracking-wider text-[#666]">
+                    Character
+                  </p>
+                  {projectId && (
+                    <button
+                      type="button"
+                      onClick={() => handleRefreshSummary(char.id)}
+                      disabled={refreshingId === char.id}
+                      className="rounded p-1 text-[#666] transition-colors hover:bg-[#e8ecff] disabled:opacity-50"
+                      aria-label="Refresh summary"
+                    >
+                      <RefreshCw
+                        className={cn(
+                          "h-3 w-3",
+                          refreshingId === char.id && "animate-spin",
+                        )}
+                      />
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 font-semibold text-[#2e2e2e]">{char.name}</p>
+                <p className="mt-1 line-clamp-3 text-xs text-[#666]">
+                  {char.metadata?.persona_summary ||
+                    char.metadata?.story_summary ||
+                    char.description ||
+                    "No summary yet. Keep writing to build character context."}
                 </p>
-                {projectId && (
-                  <button
-                    type="button"
-                    onClick={() => handleRefreshSummary(firstChar.id)}
-                    disabled={refreshingId === firstChar.id}
-                    className="rounded p-1 text-[#666] transition-colors hover:bg-[#e8ecff] disabled:opacity-50"
-                    aria-label="Refresh summary"
-                  >
-                    <RefreshCw
-                      className={cn("h-3 w-3", refreshingId === firstChar.id && "animate-spin")}
-                    />
-                  </button>
-                )}
               </div>
-              <p className="mt-1 font-semibold text-[#2e2e2e]">{firstChar.name}</p>
-              <p className="mt-1 line-clamp-3 text-xs text-[#666]">
-                {firstChar.metadata?.persona_summary ||
-                  firstChar.metadata?.story_summary ||
-                  "No summary yet. Keep writing to build character context."}
-              </p>
-            </div>
-          )}
-          {firstLoc && (
-            <div className="rounded-xl border border-[#e8e8e0] bg-[#f8deff]/40 p-3 shadow-sm">
-              <p className="text-[10px] uppercase tracking-wider text-[#666]">
-                Location
-              </p>
-              <p className="mt-1 font-semibold text-[#2e2e2e]">{firstLoc.name}</p>
-              <p className="mt-1 line-clamp-2 text-xs text-[#666]">
-                {firstLoc.metadata?.description ||
-                  firstLoc.description ||
-                  "—"}
-              </p>
-            </div>
-          )}
-          {!firstChar && !firstLoc && (
+            ))}
+
+          {locations.length > 0 &&
+            locations.map((loc) => (
+              <div
+                key={loc.id}
+                className="rounded-xl border border-[#e8e8e0] bg-[#f8deff]/40 p-3 shadow-sm"
+              >
+                <p className="text-[10px] uppercase tracking-wider text-[#666]">
+                  Location
+                </p>
+                <p className="mt-1 font-semibold text-[#2e2e2e]">{loc.name}</p>
+                <p className="mt-1 line-clamp-2 text-xs text-[#666]">
+                  {loc.metadata?.description || loc.description || "—"}
+                </p>
+              </div>
+            ))}
+
+          {characters.length === 0 && locations.length === 0 && (
             <p className="text-xs text-[#888]">
               Add characters and locations by writing in the editor.
             </p>

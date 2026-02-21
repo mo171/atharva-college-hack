@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import networkx as nx
 from supabase import Client
 
-from app.lib.supabase import supabase_client as _default_supabase
+from lib.supabase import supabase_client as _default_supabase
 
 
 @dataclass
@@ -29,7 +29,9 @@ class StoryKnowledgeGraph:
         self.entity_ids_by_name: dict[str, str] = {}
 
     @classmethod
-    def from_supabase(cls, project_id: str, supabase_client: Client | None = None) -> "StoryKnowledgeGraph":
+    def from_supabase(
+        cls, project_id: str, supabase_client: Client | None = None
+    ) -> "StoryKnowledgeGraph":
         """Build graph by loading entities and relationships for a project."""
         kg = cls(project_id=project_id, supabase_client=supabase_client)
         kg.load_from_supabase()
@@ -71,7 +73,9 @@ class StoryKnowledgeGraph:
             description = row.get("description")
             if not subject or not obj:
                 continue
-            self.graph.add_edge(subject, obj, relation=relation, description=description)
+            self.graph.add_edge(
+                subject, obj, relation=relation, description=description
+            )
 
     def add_node(self, name: str, node_type: str | None = None) -> None:
         attrs = {"node_type": node_type} if node_type else {}
@@ -104,7 +108,9 @@ class StoryKnowledgeGraph:
                 {
                     "project_id": self.project_id,
                     "name": name,
-                    "entity_type": node_type if node_type in {"CHARACTER", "LOCATION", "OBJECT"} else "OBJECT",
+                    "entity_type": node_type
+                    if node_type in {"CHARACTER", "LOCATION", "OBJECT"}
+                    else "OBJECT",
                     "is_initial_setup": False,
                 }
             )
@@ -128,7 +134,9 @@ class StoryKnowledgeGraph:
         normalized_relation = relation.upper()
         self.graph.add_node(subject)
         self.graph.add_node(obj)
-        self.graph.add_edge(subject, obj, relation=normalized_relation, description=description)
+        self.graph.add_edge(
+            subject, obj, relation=normalized_relation, description=description
+        )
 
         if not persist:
             return
@@ -170,7 +178,9 @@ class StoryKnowledgeGraph:
                 matches.append(target)
         return matches
 
-    def check_inconsistency(self, subject: str, relation: str, obj: str) -> Inconsistency | None:
+    def check_inconsistency(
+        self, subject: str, relation: str, obj: str
+    ) -> Inconsistency | None:
         relation = relation.upper()
         existing_objects = self.get_objects_for_relation(subject, relation)
 
@@ -188,16 +198,16 @@ class StoryKnowledgeGraph:
             ),
         )
 
-    def _log_consistency_issue(self, issue: Inconsistency, original_text: str | None = None) -> None:
+    def _log_consistency_issue(
+        self, issue: Inconsistency, original_text: str | None = None
+    ) -> None:
         involved_ids: list[str] = []
         for name in [issue.subject, issue.object, *issue.existing_objects]:
             entity_id = self.entity_ids_by_name.get(name)
             if entity_id:
                 involved_ids.append(entity_id)
 
-        suggested_fix = (
-            f"Reconcile {issue.subject}'s {issue.relation} state before accepting '{issue.object}'."
-        )
+        suggested_fix = f"Reconcile {issue.subject}'s {issue.relation} state before accepting '{issue.object}'."
 
         self.supabase.table("consistency_logs").insert(
             {
@@ -223,7 +233,9 @@ class StoryKnowledgeGraph:
     ) -> Inconsistency | None:
         issue = self.check_inconsistency(subject, relation, obj)
         if issue is None:
-            self.add_fact(subject, relation, obj, persist=persist, description=original_text)
+            self.add_fact(
+                subject, relation, obj, persist=persist, description=original_text
+            )
             return None
 
         if persist:
@@ -250,7 +262,13 @@ class StoryKnowledgeGraph:
                 issues.append(issue)
         return issues
 
-    def apply_svo_triples(self, triples: list[object], *, persist: bool = True) -> list[Inconsistency]:
+    def apply_svo_triples(
+        self,
+        triples: list[object],
+        *,
+        persist: bool = True,
+        original_text: str | None = None,
+    ) -> list[Inconsistency]:
         issues: list[Inconsistency] = []
         for triple in triples:
             issue = self.upsert_fact(
@@ -258,7 +276,7 @@ class StoryKnowledgeGraph:
                 relation=getattr(triple, "relation"),
                 obj=getattr(triple, "object"),
                 persist=persist,
-                original_text=getattr(triple, "sentence", None),
+                original_text=getattr(triple, "sentence", original_text),
             )
             if issue:
                 issues.append(issue)

@@ -11,7 +11,7 @@ from spacy.language import Language
 from spacy.tokens import Doc, Span, Token
 from supabase import Client
 
-from app.lib.supabase import supabase_client as _default_supabase
+from lib.supabase import supabase_client as _default_supabase
 
 
 SUBJECT_DEPS = {"nsubj", "nsubjpass", "csubj", "expl"}

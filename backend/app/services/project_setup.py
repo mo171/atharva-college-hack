@@ -1,5 +1,5 @@
-from app.lib.supabase import supabase_client
-from app.services.llm_gateway import get_embedding
+from lib.supabase import supabase_client
+from services.llm_gateway import get_embedding
 
 
 class ProjectSetupService:

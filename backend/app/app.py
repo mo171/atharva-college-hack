@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.routes import project as project_routes
-from app.routes import editor as editor_routes
-from app.routes import ws_editor as ws_editor_routes
+from config import settings
+from routes import project as project_routes
+from routes import editor as editor_routes
+from routes import ws_editor as ws_editor_routes
 
 app = FastAPI(title="Engine")
 

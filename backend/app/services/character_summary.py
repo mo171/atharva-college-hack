@@ -9,8 +9,8 @@ from typing import Any
 from openai import OpenAI
 from supabase import Client
 
-from app.lib.supabase import supabase_client as _default_supabase
-from app.services.llm_gateway import get_embedding
+from lib.supabase import supabase_client as _default_supabase
+from services.llm_gateway import get_embedding
 
 
 def _gather_character_context(

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.services.project_setup import project_setup
+from services.project_setup import project_setup
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 

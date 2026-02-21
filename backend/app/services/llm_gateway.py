@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from openai import OpenAI
 from supabase import Client
 
-from app.lib.supabase import supabase_client as _default_supabase
+from lib.supabase import supabase_client as _default_supabase
 
 
 @dataclass
