@@ -22,48 +22,58 @@ function ProjectCardProject({
     <Link href={href}>
       <Card
         className={cn(
-          "group overflow-hidden rounded-2xl border border-[#e8e8e0] bg-white shadow-md shadow-black/5 transition-all hover:shadow-lg hover:shadow-black/8",
+          "group flex flex-col h-full overflow-hidden rounded-2xl border border-white/40 bg-white/70 backdrop-blur-md shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/5",
           className,
         )}
         {...props}
       >
-        <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#f8f7ff]">
+        <div className="relative aspect-[4/3] w-full overflow-hidden">
           <Image
             src={imageSrc}
             alt={imageAlt}
             fill
-            className="object-cover"
+            className="object-cover transition-transform duration-700 group-hover:scale-105"
             sizes="(max-width: 768px) 100vw, 33vw"
           />
           <Badge
-            className="absolute bottom-2 left-2 border-0 bg-black/90 text-xs font-medium text-white"
+            className="absolute bottom-3 left-3 border-0 bg-white/90 backdrop-blur-md text-[9px] font-bold tracking-[0.1em] text-slate-800 px-2.5 py-1 uppercase"
             variant="secondary"
           >
             {genre}
           </Badge>
         </div>
-        <CardContent className="flex flex-col gap-3 p-4">
-          <h3 className="font-semibold text-[#1a1a1a]">{title}</h3>
-          <p className="text-xs text-[#888]">{lastEdited}</p>
-          <div>
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[#888]">
-              Consistency
-            </p>
-            <p className="mb-1.5 text-sm font-medium text-[#1a1a1a]">
-              {consistency}%
-            </p>
-            <Progress
-              value={consistency}
-              className="h-1.5 rounded-full bg-[#e8e8e0] [&>div]:bg-[#7cb87c]"
-            />
+        <CardContent className="flex flex-1 flex-col justify-between p-5">
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-playfair text-xl font-medium tracking-tight text-slate-900 line-clamp-1 mb-1">{title}</h3>
+              <p className="text-[11px] text-slate-500 font-medium">{lastEdited}</p>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                  Consistency
+                </p>
+                <p className="text-xs font-bold text-slate-700">
+                  {consistency}%
+                </p>
+              </div>
+              <div className="relative h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-slate-800 transition-all duration-1000 ease-out"
+                  style={{ width: `${consistency}%` }}
+                />
+              </div>
+            </div>
           </div>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e8ecff] text-[#5a5fd8] transition-colors hover:bg-[#ced3ff]"
+
+          <div className="flex justify-between items-center mt-5 pt-3 border-t border-slate-50">
+            <span className="text-[10px] text-slate-400 font-medium">Open Manuscript</span>
+            <div
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-50 text-slate-600 transition-all duration-300 group-hover:bg-slate-900 group-hover:text-white"
             >
-              <ArrowRight className="h-4 w-4" />
-            </button>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -80,17 +90,22 @@ function ProjectCardNewManuscript({
     <Link href={href}>
       <Card
         className={cn(
-          "flex min-h-[280px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#e0e0d8] bg-white/60 transition-all hover:border-[#ced3ff] hover:bg-[#f8f7ff]",
+          "group flex flex-col h-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/50 transition-all duration-300 hover:border-slate-900 hover:bg-white hover:-translate-y-1 hover:shadow-xl hover:shadow-black/5",
           className,
         )}
         {...props}
       >
-        <CardContent className="flex flex-col items-center gap-3 p-6">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#e8ecff]">
-            <Plus className="h-7 w-7 text-[#5a5fd8]" />
+        <div className="relative aspect-[4/3] w-full flex items-center justify-center bg-slate-100 transition-colors duration-300 group-hover:bg-slate-50">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-900 group-hover:text-white text-slate-400">
+            <Plus className="h-6 w-6" />
           </div>
-          <p className="text-sm font-medium text-[#666]">
+        </div>
+        <CardContent className="flex flex-1 flex-col items-center justify-center p-5 text-center">
+          <h3 className="font-playfair text-lg font-medium text-slate-900 mb-1">
             Start New Manuscript
+          </h3>
+          <p className="text-[11px] text-slate-500 max-w-[160px]">
+            Begin your next masterpiece with specialized AI assistance
           </p>
         </CardContent>
       </Card>

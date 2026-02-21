@@ -1,9 +1,11 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 
 function HeroHeading({
   children,
   highlightText,
-  highlightClassName = "text-[#5a5fd8] font-semibold italic",
+  highlightClassName = "text-[#9d8df1] italic",
   className,
   as: Comp = "h1",
   ...props
@@ -12,7 +14,7 @@ function HeroHeading({
     return (
       <Comp
         className={cn(
-          "text-4xl font-bold leading-tight tracking-tight text-[#1a1a1a] sm:text-5xl md:text-6xl",
+          "font-playfair text-5xl font-bold leading-[1.1] tracking-tight text-[#1a1a1a] sm:text-7xl md:text-8xl",
           className
         )}
         {...props}
@@ -30,7 +32,7 @@ function HeroHeading({
   return (
     <Comp
       className={cn(
-        "text-4xl font-bold leading-tight tracking-tight text-[#1a1a1a] sm:text-5xl md:text-6xl",
+        "font-playfair text-5xl font-bold leading-[1.1] tracking-tight text-[#1a1a1a] sm:text-7xl md:text-8xl",
         className
       )}
       {...props}

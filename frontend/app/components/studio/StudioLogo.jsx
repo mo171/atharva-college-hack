@@ -21,13 +21,13 @@ function StudioLogo({ className, variant = "sidebar", ...props }) {
       {...props}
     >
       <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center rounded-xl bg-[#ced3ff]/50 p-2">
+        <div className="flex items-center justify-center rounded-xl bg-slate-900 p-2.5 shadow-sm shadow-slate-200">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#5a5fd8"
-            strokeWidth="2"
+            stroke="white"
+            strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
             className="h-5 w-5"
@@ -37,10 +37,12 @@ function StudioLogo({ className, variant = "sidebar", ...props }) {
           </svg>
         </div>
         <div className="flex flex-col">
-          <span className="font-semibold tracking-tight text-[#1a1a1a]">
+          <span className="font-playfair text-xl font-bold tracking-tight text-slate-900 leading-none">
             Inkwell
           </span>
-          <span className="text-xs text-[#888]">Creative Studio</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">
+            Studio
+          </span>
         </div>
       </div>
     </Link>

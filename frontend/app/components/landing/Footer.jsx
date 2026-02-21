@@ -1,3 +1,6 @@
+"use client";
+
+import { Reveal } from "./Reveal";
 import { cn } from "@/lib/utils";
 
 function Footer({
@@ -13,7 +16,9 @@ function Footer({
       )}
       {...props}
     >
-      {text}
+      <Reveal width="100%" delay={0.1}>
+        {text}
+      </Reveal>
     </footer>
   );
 }

@@ -12,3 +12,5 @@ export { CharacterItem } from "./CharacterItem";
 export { PlotArcsPlaceholder } from "./PlotArcsPlaceholder";
 export { EditorContent } from "./EditorContent";
 export { ConsistencyAlert } from "./ConsistencyAlert";
+export { Reveal } from "./Reveal";
+export { BackgroundDecorations } from "./BackgroundDecorations";
