@@ -10,9 +10,10 @@ import { Button } from "@/app/components/ui/button";
 import { FoundationSection } from "./FoundationSection";
 import { KeyCastSection } from "./KeyCastSection";
 import { AtmosphereSection } from "./AtmosphereSection";
+import { StylePrimingSection } from "./StylePrimingSection";
 import { WorldDescriptionSection } from "./WorldDescriptionSection";
 import { cn } from "@/lib/utils";
-import { createStoryBrain } from "@/lib/api";
+import { createStoryBrain, analyzeBehavior } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 
 function StoryBrainForm({ className, ...props }) {
@@ -28,6 +29,8 @@ function StoryBrainForm({ className, ...props }) {
   const [toneValues, setToneValues] = useState([75, 25, 65]);
   const [worldDescription, setWorldDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [styleFile, setStyleFile] = useState(null);
+  const [styleAnalysis, setStyleAnalysis] = useState(null);
 
   const handleAddCharacter = () => {
     const trimmed = characterInput.trim();
@@ -91,10 +94,23 @@ function StoryBrainForm({ className, ...props }) {
         characters: characters.map((c) => ({ name: c.name, description: "" })),
         worldSetting: worldDescription.trim(),
       });
+
+      if (styleFile) {
+        toast.loading("Analyzing writing style... this may take a moment", {
+          id: "style-analysis",
+        });
+        const res = await analyzeBehavior(project_id, styleFile);
+        setStyleAnalysis(res.blueprint);
+        toast.success("Style Blueprint generated!", { id: "style-analysis" });
+      }
+
       toast.success("Story Brain initialized!");
       router.push(`/editor?projectId=${project_id}`);
     } catch (err) {
-      const msg = err.response?.data?.detail ?? err.message ?? "Failed to create project.";
+      const msg =
+        err.response?.data?.detail ??
+        err.message ??
+        "Failed to create project.";
       toast.error(typeof msg === "string" ? msg : "Failed to create project.");
     } finally {
       setIsSubmitting(false);
@@ -102,7 +118,11 @@ function StoryBrainForm({ className, ...props }) {
   };
 
   return (
-    <form className={cn("flex flex-col gap-8", className)} onSubmit={handleSubmit} {...props}>
+    <form
+      className={cn("flex flex-col gap-8", className)}
+      onSubmit={handleSubmit}
+      {...props}
+    >
       <div>
         <h1 className="text-2xl font-bold text-[#1a1a1a]">
           Create Your Story Brain
@@ -145,13 +165,21 @@ function StoryBrainForm({ className, ...props }) {
         onChange={setWorldDescription}
       />
 
+      <StylePrimingSection
+        file={styleFile}
+        onFileChange={setStyleFile}
+        analysisResult={styleAnalysis}
+      />
+
       <div className="space-y-2">
         <Button
           type="submit"
           disabled={isSubmitting}
           className="h-14 w-full gap-2 rounded-xl bg-[#ced3ff] py-6 text-base font-medium text-[#4a4a7a] shadow-md shadow-[#ced3ff]/30 transition-colors hover:bg-[#b8bff5] disabled:opacity-70"
         >
-          {isSubmitting ? "Initializing..." : "Initialize Brain & Start Writing"}
+          {isSubmitting
+            ? "Initializing..."
+            : "Initialize Brain & Start Writing"}
           <Zap className="h-4 w-4" />
         </Button>
         <p className="text-center text-xs text-[#888]">

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { getGhostSuggestion } from "@/lib/api";
 
 import { EditorCanvas } from "../components/EditorCanvas";
 
@@ -10,6 +12,10 @@ function EditorContainer({ onContentChange, alerts, className, ...props }) {
   const editorRef = useRef(null);
   const [isEmpty, setIsEmpty] = useState(false);
   const hasInitialized = useRef(false);
+  const [suggestion, setSuggestion] = useState("");
+  const idleTimerRef = useRef(null);
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get("projectId");
 
   const checkEmpty = useCallback(() => {
     const el = editorRef.current;
@@ -24,7 +30,61 @@ function EditorContainer({ onContentChange, alerts, className, ...props }) {
     if (el && onContentChange) {
       onContentChange(el.innerText ?? "");
     }
-  }, [checkEmpty, onContentChange]);
+
+    // --- MESO (GHOST TEXT) TRIGGER ---
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    setSuggestion(""); // Clear existing suggestion on type
+
+    idleTimerRef.current = setTimeout(async () => {
+      if (!el || !projectId) return;
+      const text = el.innerText || "";
+      const lastWords = text.split(/\s+/).slice(-200).join(" ");
+
+      try {
+        const res = await getGhostSuggestion({ projectId, content: lastWords });
+        if (res.status === "success" && res.suggestion) {
+          setSuggestion(res.suggestion);
+        }
+      } catch (err) {
+        console.error("Ghost suggestion error:", err);
+      }
+    }, 2000);
+  }, [checkEmpty, onContentChange, projectId]);
+
+  // Handle Tab key to commit suggestion
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Tab" && suggestion) {
+        e.preventDefault();
+
+        // Simple implementation: append to end or cursor
+        // For contenteditable, we can append to innerText
+        const currentText = el.innerText || "";
+        const newText = currentText.endsWith(" ")
+          ? currentText + suggestion
+          : currentText + " " + suggestion;
+
+        // This is a destructive update, in production use Document fragments or selection API
+        el.innerText = newText;
+        setSuggestion("");
+        if (onContentChange) onContentChange(newText);
+
+        // Focus end
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    };
+
+    el.addEventListener("keydown", handleKeyDown);
+    return () => el.removeEventListener("keydown", handleKeyDown);
+  }, [suggestion, onContentChange]);
 
   useEffect(() => {
     if (!alerts || alerts.length === 0 || !editorRef.current) return;
@@ -73,15 +133,25 @@ function EditorContainer({ onContentChange, alerts, className, ...props }) {
   }, []);
 
   return (
-    <EditorCanvas
-      editorRef={editorRef}
-      initialHtml={DEFAULT_HTML}
-      onInput={handleInput}
-      placeholder="Start writing your story..."
-      isEmpty={isEmpty}
-      className={className}
-      {...props}
-    />
+    <div className="relative">
+      <EditorCanvas
+        editorRef={editorRef}
+        initialHtml={DEFAULT_HTML}
+        onInput={handleInput}
+        placeholder="Start writing your story..."
+        isEmpty={isEmpty}
+        className={className}
+        {...props}
+      />
+      {suggestion && (
+        <div className="pointer-events-none absolute right-10 bottom-10 max-w-xs animate-in fade-in slide-in-from-bottom-2 bg-white/80 backdrop-blur p-3 rounded-lg border border-[#ced3ff] shadow-sm text-sm text-[#4a4a7a] italic">
+          <span className="text-xs font-bold text-[#ced3ff] block mb-1 uppercase tracking-widest">
+            Ghost Suggestion (Tab to Accept)
+          </span>
+          "{suggestion}"
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -14,6 +14,7 @@ from services.extraction import (
 from services.llm_gateway import get_embedding, SupabaseInsightService
 from services.character_summary import update_character_summary
 from services.correction import get_correction_suite
+from services.suggestion import get_suggestion_service
 
 router = APIRouter(prefix="/editor", tags=["Narrative Editor"])
 
@@ -30,6 +31,11 @@ class WriteRequest(BaseModel):
 class SaveRequest(BaseModel):
     project_id: str = Field(..., example="uuid-123-project")
     content: str = Field(..., example="Draft content...")
+
+
+class SuggestionRequest(BaseModel):
+    project_id: str = Field(..., example="uuid-123-project")
+    content: str = Field(..., example="Current story text context...")
 
 
 class EntityResponse(BaseModel):
@@ -261,3 +267,33 @@ async def manual_entity_update(entity_id: str, metadata_patch: Dict[str, Any]):
         .execute()
     )
     return {"status": "updated", "data": res.data}
+
+
+@router.post("/suggest")
+async def get_editing_suggestion(request: SuggestionRequest):
+    """
+    Generate a Ghost Text suggestion based on the last 200 words
+    and the project's style blueprint.
+    """
+    try:
+        # 1. Fetch style blueprint
+        project = (
+            supabase_client.table("projects")
+            .select("style_blueprint")
+            .eq("id", request.project_id)
+            .single()
+            .execute()
+        )
+
+        blueprint = project.data.get("style_blueprint") if project.data else {}
+
+        # 2. Get suggestion
+        service = get_suggestion_service()
+        suggestion = service.get_ghost_suggestion(
+            context_text=request.content, blueprint=blueprint
+        )
+
+        return {"status": "success", "suggestion": suggestion}
+    except Exception as e:
+        print(f"Ghost Text Error: {e}")
+        return {"status": "error", "suggestion": ""}

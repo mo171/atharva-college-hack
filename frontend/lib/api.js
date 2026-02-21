@@ -90,3 +90,32 @@ export async function refreshCharacterSummary({ projectId, entityId }) {
   });
   return data;
 }
+
+/**
+ * Get ghost text suggestion based on current context.
+ */
+export async function getGhostSuggestion({ projectId, content }) {
+  const { data } = await api.post("/editor/suggest", {
+    project_id: projectId,
+    content,
+  });
+  return data;
+}
+
+/**
+ * Upload a PDF/TXT for behavioral style analysis.
+ */
+export async function analyzeBehavior(projectId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await api.post(
+    `/projects/${projectId}/analyze-behavior`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
+  );
+  return data;
+}
