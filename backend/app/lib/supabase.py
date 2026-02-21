@@ -1,12 +1,23 @@
 import os
 from supabase import create_client, Client
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.config import settings
+
 
 def get_supabase_client() -> Client:
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_PUBLISHABLE_KEY")
-    return create_client(url, key)
+    """
+    Construct a Supabase client using centralized settings.
+    """
+    if not settings.supabase_url or not settings.supabase_anon_key:
+        raise RuntimeError(
+            "Supabase configuration is missing. "
+            "Ensure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are set."
+        )
 
-supabase = get_supabase_client()
+    return create_client(settings.supabase_url, settings.supabase_anon_key)
+
+
+# Backwards-compatible export and the name used throughout routes/services
+supabase_client: Client = get_supabase_client()
+supabase: Client = supabase_client
+
