@@ -15,10 +15,6 @@ export default function StartWritingPage() {
   const [activeTab, setActiveTab] = useState("recent");
   const [view, setView] = useState("grid");
 
-  const filteredProjects = MOCK_PROJECTS.filter(
-    (project) => project.category === activeTab
-  );
-
   return (
     <div className="flex flex-col gap-8">
       <StudioHeader />
@@ -26,7 +22,7 @@ export default function StartWritingPage() {
         <ProjectTabs activeTab={activeTab} onTabChange={setActiveTab} />
         <ViewToggle view={view} onViewChange={setView} />
       </div>
-      <ProjectGrid projects={filteredProjects} />
+      <ProjectGrid />
     </div>
   );
 }

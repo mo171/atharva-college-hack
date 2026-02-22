@@ -30,6 +30,16 @@ export async function createStoryBrain({
 }
 
 /**
+ * Fetch all projects for a specific user.
+ * @param {string} userId
+ * @returns {Promise<{ status: string, projects: Array }>}
+ */
+export async function fetchUserProjects(userId) {
+  const { data } = await api.get(`/projects/user/${userId}`);
+  return data;
+}
+
+/**
  * Analyze writing content for a project.
  * @param {{ projectId: string, content: string }}
  * @returns {Promise<{ status: string, entities: Array, alerts: Array, resolved_context: string, detected_actions: Array }>}
@@ -215,7 +225,12 @@ export async function extractPlotPoints(projectId) {
  * @param {{ projectId: string, title: string, description?: string, color?: string }}
  * @returns {Promise<{ status: string, thread: Object }>}
  */
-export async function createPlotThread({ projectId, title, description, color }) {
+export async function createPlotThread({
+  projectId,
+  title,
+  description,
+  color,
+}) {
   const { data } = await api.post(`/plot-thread/${projectId}/thread`, {
     title,
     description,

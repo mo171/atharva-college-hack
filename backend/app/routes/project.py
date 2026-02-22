@@ -69,3 +69,19 @@ async def analyze_behavior(project_id: str, file: UploadFile = File(...)):
         return {"status": "success", "blueprint": blueprint}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}")
+
+
+@router.get("/user/{user_id}")
+async def get_user_projects(user_id: str):
+    """Retrieve all projects for a specific user."""
+    try:
+        res = (
+            supabase_client.table("projects")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return {"status": "success", "projects": res.data}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not fetch projects: {exc}")

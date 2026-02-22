@@ -1,3 +1,6 @@
+"use client";
+
+import { useAuth } from "@/store/authStore";
 import Link from "next/link";
 
 import { Logo } from "./Logo";
@@ -13,6 +16,8 @@ const NAV_ITEMS = [
 ];
 
 function Navbar({ className, ...props }) {
+  const { user } = useAuth();
+
   return (
     <header
       className={cn(
@@ -31,9 +36,15 @@ function Navbar({ className, ...props }) {
           ))}
         </div>
         <div className="flex items-center gap-4">
-          <NavLink href="/login" variant="default">
-            Log In
-          </NavLink>
+          {user ? (
+            <NavLink href="/new-project" variant="default">
+              New Project
+            </NavLink>
+          ) : (
+            <NavLink href="/login" variant="default">
+              Log In
+            </NavLink>
+          )}
           <Link href="/start-writing">
             <Button
               className="rounded-lg bg-[#ced3ff] px-4 py-2 text-[#4a4a7a] shadow-sm transition-colors hover:bg-[#b8bff5]"

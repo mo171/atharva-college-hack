@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import { getGhostSuggestion } from "@/lib/api";
+import { useProjectStore } from "@/store/projectStore";
 
 import { EditorCanvas } from "../components/EditorCanvas";
 
@@ -81,7 +82,12 @@ const EditorContainer = forwardRef(function EditorContainer(
 
     idleTimerRef.current = setTimeout(async () => {
       if (!el || !projectId) return;
+
       const text = el.innerText || "";
+
+      // --- AUTOSAVE (MEMO) ---
+      useProjectStore.getState().updateEditorCache(projectId, text);
+
       const lastWords = text.split(/\s+/).slice(-200).join(" ");
 
       try {
@@ -94,6 +100,53 @@ const EditorContainer = forwardRef(function EditorContainer(
       }
     }, 2000);
   }, [checkEmpty, onContentChange, projectId]);
+
+  // Restore from cache or backend on first mount
+  useEffect(() => {
+    if (projectId && !hasInitialized.current) {
+      const loadInitialContent = async () => {
+        // 1. Try local cache (Frontend Memory) first
+        const cache = useProjectStore.getState().getEditorCache(projectId);
+        let contentToLoad = cache;
+
+        // 2. If no cache, try backend fallback
+        if (!contentToLoad) {
+          try {
+            const { fetchStoryBrain } = await import("@/lib/api");
+            const data = await fetchStoryBrain(projectId);
+            if (data.recent_history && data.recent_history.length > 0) {
+              contentToLoad = data.recent_history[0].content;
+            }
+          } catch (err) {
+            console.error("Failed to load initial content from backend:", err);
+          }
+        }
+
+        if (contentToLoad && editorRef.current) {
+          // Only restore if editor is currently empty or contains default hint
+          const currentText = editorRef.current.innerText.trim();
+          if (!currentText || currentText.includes("Elias descended")) {
+            const paragraphs = contentToLoad
+              .split(/\n\n+/)
+              .filter((p) => p.trim());
+            const html = paragraphs
+              .map((p) => `<p>${p.trim().replace(/\n/g, "<br>")}</p>`)
+              .join("");
+            editorRef.current.innerHTML = html;
+            checkEmpty();
+
+            // Notify parent of the loaded content
+            if (onContentChange) {
+              onContentChange(contentToLoad);
+            }
+          }
+        }
+        hasInitialized.current = true;
+      };
+
+      loadInitialContent();
+    }
+  }, [projectId, checkEmpty, onContentChange]);
 
   // Handle Tab key to commit suggestion
   useEffect(() => {
