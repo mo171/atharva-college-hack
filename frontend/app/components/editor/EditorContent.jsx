@@ -27,6 +27,8 @@ function EditorContent({
   alerts,
   onAnalysis,
   onStoryBrainRefresh,
+  onEditorContentChange,
+  onApplyFix,
   className,
   ...props
 }) {
@@ -59,6 +61,9 @@ function EditorContent({
       lastContentRef.current = text;
       setEditorText(text);
       setSyncStatus("Typing...");
+      
+      // Notify parent of content change
+      onEditorContentChange?.(text);
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(async () => {
@@ -78,7 +83,7 @@ function EditorContent({
         }
       }, 900); // 2 second debounce for auto-save
     },
-    [projectId, onAnalysis, onStoryBrainRefresh],
+    [projectId, onAnalysis, onStoryBrainRefresh, onEditorContentChange],
   );
 
   const handleManualAnalyze = async () => {
@@ -149,6 +154,17 @@ function EditorContent({
     },
     [handleContentChange],
   );
+
+  // Expose apply fix handler to parent
+  useEffect(() => {
+    if (onApplyFix) {
+      // Store the handler so it can be called from outside
+      window.__editorApplyFix = handleApplyChanges;
+    }
+    return () => {
+      delete window.__editorApplyFix;
+    };
+  }, [onApplyFix, handleApplyChanges]);
 
   useEffect(() => {
     return () => {

@@ -4,7 +4,9 @@ import { useState } from "react";
 import { AlertTriangle, Wand2, Target, Square, FileText } from "lucide-react";
 
 import { Button } from "@/app/components/ui/button";
+import { SuggestionDialog } from "./SuggestionDialog";
 import { cn } from "@/lib/utils";
+import { fixSpelling, getGrammarSuggestion } from "@/lib/api";
 
 const ALERT_STYLES = {
   INCONSISTENCY: {
@@ -61,6 +63,8 @@ function InsightCard({
   text,
   primaryAction,
   onDismiss,
+  onFix,
+  disabled,
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-[#e8e8e0] bg-white shadow-md shadow-black/5">
@@ -79,12 +83,15 @@ function InsightCard({
             size="sm"
             className="flex-1"
             onClick={onDismiss}
+            disabled={disabled}
           >
             DISMISS
           </Button>
           <Button
             size="sm"
             className="flex-1 bg-[#ced3ff] text-[#4a4a7a] transition-colors hover:bg-[#b8bff5]"
+            onClick={onFix}
+            disabled={disabled}
           >
             {primaryAction}
           </Button>
@@ -94,8 +101,17 @@ function InsightCard({
   );
 }
 
-function AIInsightsSidebar({ alerts = [], className, ...props }) {
+function AIInsightsSidebar({ 
+  alerts = [], 
+  projectId,
+  editorContent,
+  onApplyFix,
+  className, 
+  ...props 
+}) {
   const [dismissed, setDismissed] = useState(new Set());
+  const [suggestionDialog, setSuggestionDialog] = useState(null);
+  const [isFixing, setIsFixing] = useState(false);
 
   const visibleAlerts = alerts
     .map((a, i) => ({ ...a, _idx: i }))
@@ -104,6 +120,127 @@ function AIInsightsSidebar({ alerts = [], className, ...props }) {
 
   const handleDismiss = (idx) => {
     setDismissed((prev) => new Set([...prev, idx]));
+  };
+
+  const handleFix = async (alert) => {
+    if (!projectId || !editorContent || isFixing) return;
+
+    const alertType = alert.type;
+
+    // Handle spelling errors - direct fix
+    if (alertType === "SPELLING") {
+      setIsFixing(true);
+      try {
+        const originalWord = alert.original_text || "";
+        const explanation = alert.explanation || "";
+        
+        // Extract suggestion from explanation
+        let suggestion = "";
+        if (explanation.includes("Did you mean:")) {
+          const suggestionsText = explanation.split("Did you mean:")[1].split("?")[0].trim();
+          suggestion = suggestionsText.split(",")[0].trim();
+        }
+
+        if (!suggestion) {
+          console.error("No suggestion found for spelling error");
+          return;
+        }
+
+        const result = await fixSpelling({
+          projectId,
+          content: editorContent,
+          word: originalWord,
+          suggestion: suggestion,
+        });
+
+        if (result.status === "success" && onApplyFix) {
+          onApplyFix(result.corrected_text);
+          handleDismiss(alert._idx);
+        }
+      } catch (error) {
+        console.error("Failed to fix spelling:", error);
+      } finally {
+        setIsFixing(false);
+      }
+    }
+    // Handle grammar errors - show suggestion dialog
+    else if (alertType === "GRAMMAR" || alertType === "STYLE") {
+      setIsFixing(true);
+      try {
+        const result = await getGrammarSuggestion({
+          projectId,
+          content: editorContent,
+          alert: alert,
+        });
+
+        if (result.status === "success") {
+          setSuggestionDialog({
+            originalText: result.original_text || "",
+            suggestedText: result.suggested_text || "",
+            explanation: result.explanation || alert.explanation || "",
+            alertType: alertType,
+            alert: alert,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to get grammar suggestion:", error);
+      } finally {
+        setIsFixing(false);
+      }
+    }
+  };
+
+  const handleApplySuggestion = async (finalText) => {
+    if (!suggestionDialog || !onApplyFix) return;
+
+    try {
+      // Find the original text in the editor content and replace it
+      const originalText = suggestionDialog.originalText;
+      const editorText = editorContent;
+      
+      // Try to find and replace the original text
+      let correctedText = editorText;
+      
+      // First try exact match
+      if (editorText.includes(originalText)) {
+        // Replace first occurrence
+        correctedText = editorText.replace(originalText, finalText);
+      } else {
+        // Try case-insensitive match
+        const regex = new RegExp(originalText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        if (regex.test(editorText)) {
+          correctedText = editorText.replace(regex, finalText);
+        } else {
+          // If no match found, try to find similar text or just replace the whole content
+          // For now, we'll try to be smart about it - find the sentence containing the original
+          const sentences = editorText.split(/[.!?]+/);
+          const matchingSentence = sentences.find(s => 
+            s.toLowerCase().includes(originalText.toLowerCase())
+          );
+          
+          if (matchingSentence) {
+            const sentenceIndex = editorText.indexOf(matchingSentence);
+            const beforeSentence = editorText.substring(0, sentenceIndex);
+            const afterSentence = editorText.substring(sentenceIndex + matchingSentence.length);
+            correctedText = beforeSentence + finalText + afterSentence;
+          } else {
+            // Last resort: append the suggestion
+            correctedText = editorText + " " + finalText;
+          }
+        }
+      }
+
+      onApplyFix(correctedText);
+      
+      // Dismiss the alert
+      if (suggestionDialog.alert) {
+        handleDismiss(suggestionDialog.alert._idx);
+      }
+      
+      setSuggestionDialog(null);
+    } catch (error) {
+      console.error("Failed to apply suggestion:", error);
+    }
   };
 
   return (
@@ -137,6 +274,8 @@ function AIInsightsSidebar({ alerts = [], className, ...props }) {
               text={alert.explanation ?? "—"}
               primaryAction={style.primaryAction}
               onDismiss={() => handleDismiss(alert._idx)}
+              onFix={() => handleFix(alert)}
+              disabled={isFixing}
             />
           );
         })}
@@ -165,6 +304,21 @@ function AIInsightsSidebar({ alerts = [], className, ...props }) {
           FOCUS MODE
         </Button>
       </div>
+
+      {/* Suggestion Dialog */}
+      {suggestionDialog && (
+        <SuggestionDialog
+          open={!!suggestionDialog}
+          onOpenChange={(open) => {
+            if (!open) setSuggestionDialog(null);
+          }}
+          originalText={suggestionDialog.originalText}
+          suggestedText={suggestionDialog.suggestedText}
+          explanation={suggestionDialog.explanation}
+          alertType={suggestionDialog.alertType}
+          onApply={handleApplySuggestion}
+        />
+      )}
     </aside>
   );
 }

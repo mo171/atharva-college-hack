@@ -126,6 +126,53 @@ export async function generateSuggestions({ projectId, content }) {
 }
 
 /**
+ * Fix a spelling error in the text.
+ * @param {{ projectId: string, content: string, word: string, suggestion: string }}
+ * @returns {Promise<{ status: string, corrected_text: string }>}
+ */
+export async function fixSpelling({ projectId, content, word, suggestion }) {
+  try {
+    const { data } = await api.post("/editor/fix-spelling", {
+      project_id: projectId,
+      content,
+      word,
+      suggestion,
+    });
+    return data;
+  } catch (error) {
+    console.error("Fix spelling API error:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
+    throw error;
+  }
+}
+
+/**
+ * Get grammar suggestion for a specific alert.
+ * @param {{ projectId: string, content: string, alert: object }}
+ * @returns {Promise<{ status: string, original_text: string, suggested_text: string, explanation: string }>}
+ */
+export async function getGrammarSuggestion({ projectId, content, alert }) {
+  try {
+    const { data } = await api.post("/editor/get-grammar-suggestion", {
+      project_id: projectId,
+      content,
+      alert,
+    });
+    return data;
+  } catch (error) {
+    console.error("Get grammar suggestion API error:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
+    throw error;
+  }
+}
+
+/**
  * Upload a PDF/TXT for behavioral style analysis.
  */
 export async function analyzeBehavior(projectId, file) {

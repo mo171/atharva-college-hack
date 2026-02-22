@@ -23,6 +23,7 @@ function EditorPageContent() {
   });
   const [alerts, setAlerts] = useState([]);
   const [activeEntityNames, setActiveEntityNames] = useState([]);
+  const [editorContent, setEditorContent] = useState("");
 
   useEffect(() => {
     if (!projectId) {
@@ -90,8 +91,21 @@ function EditorPageContent() {
               );
             }
           }}
+          onEditorContentChange={setEditorContent}
         />
-        <AIInsightsSidebar className="hidden xl:flex" alerts={alerts} />
+        <AIInsightsSidebar 
+          className="hidden xl:flex" 
+          alerts={alerts}
+          projectId={projectId}
+          editorContent={editorContent}
+          onApplyFix={(correctedText) => {
+            // Apply fix to editor via global handler
+            if (window.__editorApplyFix) {
+              window.__editorApplyFix(correctedText);
+            }
+            setEditorContent(correctedText);
+          }}
+        />
       </div>
     </div>
   );
