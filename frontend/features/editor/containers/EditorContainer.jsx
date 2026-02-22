@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import { getGhostSuggestion } from "@/lib/api";
 
@@ -8,7 +16,10 @@ import { EditorCanvas } from "../components/EditorCanvas";
 
 const DEFAULT_HTML = `<p>Elias descended the worn stone steps, the smell of dried herbs and decay thickening with each step. The apothecary's cellar had always felt like a threshold between worlds—half laboratory, half crypt.</p><p><span class="insight-highlight insight-highlight-grammar" data-tooltip="This sentence has a complex structure. Consider shortening it for better flow.">He remembered the sunlit garden outside, a stark contrast to the darkness he now inhabited.</span> The memory felt distant, almost belonging to another man.</p><p><span class="insight-highlight insight-highlight-style" data-tooltip="This action feels abrupt. You might want to describe Elias's physical reaction to the draft.">He stood up and looked around the room, wondering where the potion could have gone.</span> The shelves were lined with amber bottles, their labels faded beyond recognition. None of them resembled what he had come for.</p><p>A faint draft stirred the dust. Elias turned, but the shadows yielded <span class="insight-highlight insight-highlight-spelling" data-tooltip="Possible typo: 'nothin'. Did you mean: nothing, notion, north?">nothin</span>. The silence was total—the kind of silence that seemed to listen.</p>`;
 
-const EditorContainer = forwardRef(function EditorContainer({ onContentChange, alerts, className, ...props }, ref) {
+const EditorContainer = forwardRef(function EditorContainer(
+  { onContentChange, alerts, className, ...props },
+  ref,
+) {
   const editorRef = useRef(null);
   const [isEmpty, setIsEmpty] = useState(false);
   const hasInitialized = useRef(false);
@@ -23,9 +34,11 @@ const EditorContainer = forwardRef(function EditorContainer({ onContentChange, a
       const el = editorRef.current;
       if (el) {
         // Convert plain text to HTML paragraphs
-        const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-        const html = paragraphs.map(p => `<p>${p.trim().replace(/\n/g, '<br>')}</p>`).join('');
-        el.innerHTML = html || '<p></p>';
+        const paragraphs = text.split(/\n\n+/).filter((p) => p.trim());
+        const html = paragraphs
+          .map((p) => `<p>${p.trim().replace(/\n/g, "<br>")}</p>`)
+          .join("");
+        el.innerHTML = html || "<p></p>";
         setIsEmpty(!text.trim());
         if (onContentChange) {
           onContentChange(text);
@@ -35,7 +48,17 @@ const EditorContainer = forwardRef(function EditorContainer({ onContentChange, a
     getContent: () => {
       const el = editorRef.current;
       return el ? el.innerText : "";
-    }
+    },
+    focusHighlight: (insightId) => {
+      const el = editorRef.current;
+      if (!el) return;
+      const highlight = el.querySelector(`[data-insight-id="${insightId}"]`);
+      if (highlight) {
+        highlight.scrollIntoView({ behavior: "smooth", block: "center" });
+        highlight.classList.add("highlight-focused");
+        setTimeout(() => highlight.classList.remove("highlight-focused"), 2000);
+      }
+    },
   }));
 
   const checkEmpty = useCallback(() => {
@@ -130,28 +153,80 @@ const EditorContainer = forwardRef(function EditorContainer({ onContentChange, a
       }
     };
 
-    alerts.forEach((alert) => {
-      if (alert.original_text) {
-        // Prevent redundant wrapping
-        if (
-          html.includes(alert.original_text) &&
-          !html.includes(`data-insight-id`)
-        ) {
-          const escapedText = alert.original_text.replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&",
-          );
-          const regex = new RegExp(`(?<!<[^>]*)${escapedText}(?![^<]*>)`, "g"); // Avoid wrapping text inside tags
+    // To prevent double wrapping and handle overlapping matches, we do a more structured replacement
+    alerts.forEach((alert, index) => {
+      if (!alert.original_text) return;
 
-          const highlightClass = getHighlightClass(alert.type);
-          const tooltipText = alert.explanation;
+      const escapedText = alert.original_text
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/\s+/g, "(?:\\s|&nbsp;)+");
 
-          html = html.replace(
-            regex,
-            `<span class="insight-highlight ${highlightClass}" data-insight-id="${Math.random().toString(36).substr(2, 9)}" data-tooltip="${tooltipText.replace(/"/g, "&quot;")}">${alert.original_text}</span>`,
-          );
-          modified = true;
+      const highlightClass = getHighlightClass(alert.type);
+      const tooltipText = (alert.explanation || "").replace(/"/g, "&quot;");
+      const insightId =
+        alert.id || `alert-${index}-${Math.random().toString(36).substr(2, 5)}`;
+
+      // Robust regex that matches:
+      // 1. Existing highlight spans (p1) - to avoid double wrapping
+      // 2. Any other HTML tags (p2) - to avoid matching inside attributes
+      // 3. The target text (p3)
+      const regex = new RegExp(
+        `(<span[^>]*class="insight-highlight[^>]*>.*?<\\/span>)|(<[^>]+>)|(${escapedText})`,
+        "gi",
+      );
+
+      let hasMatch = false;
+      let currentRegex = regex;
+
+      // Stage 1: Try exact (escaped) match
+      const resultHtml = html.replace(currentRegex, (match, p1, p2, p3) => {
+        if (p1 || p2) return match;
+        if (p3) {
+          hasMatch = true;
+          return `<span class="insight-highlight ${highlightClass}" data-insight-id="${insightId}" data-tooltip="${tooltipText}">${p3}</span>`;
         }
+        return match;
+      });
+
+      // Stage 2: Fallback to "Relaxed Matching" if no exact match found
+      if (!hasMatch) {
+        const words = alert.original_text.trim().split(/\s+/);
+        if (words.length >= 4) {
+          // Match first 2 words ... last 2 words
+          const firstPart = words
+            .slice(0, 2)
+            .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+            .join("(?:\\s|&nbsp;)+");
+          const lastPart = words
+            .slice(-2)
+            .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+            .join("(?:\\s|&nbsp;)+");
+          const relaxedPattern = `${firstPart}.*?${lastPart}`;
+          const relaxedRegex = new RegExp(
+            `(<span[^>]*class="insight-highlight[^>]*>.*?<\\/span>)|(<[^>]+>)|(${relaxedPattern})`,
+            "gi",
+          );
+
+          const relaxedResult = html.replace(
+            relaxedRegex,
+            (match, p1, p2, p3) => {
+              if (p1 || p2) return match;
+              if (p3) {
+                hasMatch = true;
+                return `<span class="insight-highlight ${highlightClass}" data-insight-id="${insightId}" data-tooltip="${tooltipText}">${p3}</span>`;
+              }
+              return match;
+            },
+          );
+
+          if (hasMatch) {
+            html = relaxedResult;
+            modified = true;
+          }
+        }
+      } else {
+        html = resultHtml;
+        modified = true;
       }
     });
 

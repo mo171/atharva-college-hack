@@ -14,6 +14,8 @@ class CorrectionSuite:
         words = re.findall(r"\b\w+\b", text)
         misspelled = self.spell.unknown(words)
 
+        import uuid
+
         alerts = []
         for word in misspelled:
             # We skip highly capitalized acronyms or things that look like character names
@@ -28,6 +30,7 @@ class CorrectionSuite:
 
             alerts.append(
                 {
+                    "id": str(uuid.uuid4()),
                     "type": "SPELLING",
                     "entity": word,
                     "explanation": f"Possible typo found: '{word}'. {suggestion_text}",
@@ -54,16 +57,16 @@ class CorrectionSuite:
     def apply_spelling_fix(self, text: str, word: str, suggestion: str) -> str:
         """Replace a misspelled word with its suggestion."""
         # Use word boundaries to avoid partial matches
-        pattern = re.compile(r'\b' + re.escape(word) + r'\b', re.IGNORECASE)
+        pattern = re.compile(r"\b" + re.escape(word) + r"\b", re.IGNORECASE)
         return pattern.sub(suggestion, text)
 
     def generate_corrected_text(self, text: str, alerts: list[dict]) -> str:
         """Generate a corrected version of the text by applying all alerts."""
         corrected = text
-        
+
         # Process alerts in order, but we need to be careful about overlapping text
         # Sort by position in text (if available) or process spelling first, then grammar
-        
+
         # First, apply spelling fixes (they're simpler word replacements)
         spelling_alerts = [a for a in alerts if a.get("type") == "SPELLING"]
         for alert in spelling_alerts:
@@ -72,16 +75,22 @@ class CorrectionSuite:
                 # Extract first suggestion from explanation or use spellchecker
                 explanation = alert.get("explanation", "")
                 if "Did you mean:" in explanation:
-                    suggestions = explanation.split("Did you mean:")[1].split("?")[0].strip()
+                    suggestions = (
+                        explanation.split("Did you mean:")[1].split("?")[0].strip()
+                    )
                     first_suggestion = suggestions.split(",")[0].strip()
                     if first_suggestion:
-                        corrected = self.apply_spelling_fix(corrected, original, first_suggestion)
+                        corrected = self.apply_spelling_fix(
+                            corrected, original, first_suggestion
+                        )
                 else:
                     # Fallback: use spellchecker directly
                     suggestions = list(self.spell.candidates(original) or [])
                     if suggestions:
-                        corrected = self.apply_spelling_fix(corrected, original, suggestions[0])
-        
+                        corrected = self.apply_spelling_fix(
+                            corrected, original, suggestions[0]
+                        )
+
         # Then apply grammar/style fixes using LLM
         grammar_alerts = [a for a in alerts if a.get("type") in ["GRAMMAR", "STYLE"]]
         if grammar_alerts:
@@ -93,7 +102,7 @@ class CorrectionSuite:
                     explanation = alert.get("explanation", "")
                     if original and explanation:
                         alert_descriptions.append(f"- '{original}': {explanation}")
-                
+
                 if alert_descriptions:
                     prompt = (
                         "You are a professional copyeditor. Fix the following text by applying these corrections:\n\n"
@@ -103,17 +112,19 @@ class CorrectionSuite:
                         "Do not add explanations or markdown.\n\n"
                         f"Text to correct:\n{corrected}"
                     )
-                    
+
                     response = self.generator.client.chat.completions.create(
                         model=self.generator.model,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.1,
                     )
-                    
-                    corrected = (response.choices[0].message.content or corrected).strip()
+
+                    corrected = (
+                        response.choices[0].message.content or corrected
+                    ).strip()
             except Exception as e:
                 print(f"Warning: LLM correction failed: {e}")
-        
+
         return corrected
 
 

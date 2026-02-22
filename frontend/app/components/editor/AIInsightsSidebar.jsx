@@ -55,6 +55,7 @@ const DEFAULT_STYLE = {
 };
 
 function InsightCard({
+  id,
   type,
   subLabel,
   headerBg,
@@ -64,16 +65,42 @@ function InsightCard({
   primaryAction,
   onDismiss,
   onFix,
+  onHighlight,
   disabled,
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#e8e8e0] bg-white shadow-md shadow-black/5">
-      <div className={cn("px-4 py-3", headerBg)}>
+    <div className="overflow-hidden rounded-2xl border border-[#e8e8e0] bg-white shadow-md shadow-black/5 transition-all hover:shadow-lg hover:shadow-black/10">
+      <div
+        className={cn("flex items-center justify-between px-4 py-3", headerBg)}
+      >
         <div className="flex items-center gap-2">
-          <Icon className={cn("h-4 w-4", iconColor)} />
-          <span className="font-semibold text-[#2e2e2e]">{type}</span>
+          <div
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-lg bg-white/50",
+              iconColor,
+            )}
+          >
+            <Icon className="h-4 w-4" />
+          </div>
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-[#2e2e2e]">
+              {type}
+            </span>
+            <p className="text-[10px] font-medium text-[#666]">{subLabel}</p>
+          </div>
         </div>
-        <p className="mt-0.5 text-xs text-[#666]">{subLabel}</p>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 rounded-full hover:bg-black/5"
+          onClick={(e) => {
+            e.stopPropagation();
+            onHighlight?.(id);
+          }}
+          title="Locate in text"
+        >
+          <Target className="h-3.5 w-3.5 text-[#5a5fd8]" />
+        </Button>
       </div>
       <div className="p-4">
         <p className="text-sm leading-relaxed text-[#2e2e2e]">{text}</p>
@@ -81,7 +108,7 @@ function InsightCard({
           <Button
             variant="outline"
             size="sm"
-            className="flex-1"
+            className="h-8 flex-1 rounded-xl text-[11px] font-bold tracking-tight"
             onClick={onDismiss}
             disabled={disabled}
           >
@@ -89,7 +116,7 @@ function InsightCard({
           </Button>
           <Button
             size="sm"
-            className="flex-1 bg-[#ced3ff] text-[#4a4a7a] transition-colors hover:bg-[#b8bff5]"
+            className="h-8 flex-1 rounded-xl bg-[#ced3ff] text-[11px] font-bold tracking-tight text-[#4a4a7a] transition-colors hover:bg-[#5a5fd8] hover:text-white"
             onClick={onFix}
             disabled={disabled}
           >
@@ -101,22 +128,37 @@ function InsightCard({
   );
 }
 
-function AIInsightsSidebar({ 
-  alerts = [], 
+function AIInsightsSidebar({
+  alerts = [],
   projectId,
   editorContent,
   onApplyFix,
-  className, 
-  ...props 
+  onHighlight,
+  className,
+  ...props
 }) {
   const [dismissed, setDismissed] = useState(new Set());
   const [suggestionDialog, setSuggestionDialog] = useState(null);
   const [isFixing, setIsFixing] = useState(false);
+  const [activeTab, setActiveTab] = useState("ALL"); // ALL, POLISH, NARRATIVE
 
   const visibleAlerts = alerts
     .map((a, i) => ({ ...a, _idx: i }))
     .filter((a) => !dismissed.has(a._idx));
-  const count = visibleAlerts.length;
+
+  const filteredAlerts = visibleAlerts.filter((alert) => {
+    if (activeTab === "ALL") return true;
+    if (activeTab === "POLISH") {
+      return ["SPELLING", "GRAMMAR", "STYLE"].includes(alert.type);
+    }
+    if (activeTab === "NARRATIVE") {
+      return ["INCONSISTENCY", "POV_SHIFT", "TONE_CLASH"].includes(alert.type);
+    }
+    return true;
+  });
+
+  const count = filteredAlerts.length;
+  const totalCount = visibleAlerts.length;
 
   const handleDismiss = (idx) => {
     setDismissed((prev) => new Set([...prev, idx]));
@@ -133,11 +175,14 @@ function AIInsightsSidebar({
       try {
         const originalWord = alert.original_text || "";
         const explanation = alert.explanation || "";
-        
+
         // Extract suggestion from explanation
         let suggestion = "";
         if (explanation.includes("Did you mean:")) {
-          const suggestionsText = explanation.split("Did you mean:")[1].split("?")[0].trim();
+          const suggestionsText = explanation
+            .split("Did you mean:")[1]
+            .split("?")[0]
+            .trim();
           suggestion = suggestionsText.split(",")[0].trim();
         }
 
@@ -197,31 +242,36 @@ function AIInsightsSidebar({
       // Find the original text in the editor content and replace it
       const originalText = suggestionDialog.originalText;
       const editorText = editorContent;
-      
+
       // Try to find and replace the original text
       let correctedText = editorText;
-      
+
       // First try exact match
       if (editorText.includes(originalText)) {
         // Replace first occurrence
         correctedText = editorText.replace(originalText, finalText);
       } else {
         // Try case-insensitive match
-        const regex = new RegExp(originalText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        const regex = new RegExp(
+          originalText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+          "i",
+        );
         if (regex.test(editorText)) {
           correctedText = editorText.replace(regex, finalText);
         } else {
           // If no match found, try to find similar text or just replace the whole content
           // For now, we'll try to be smart about it - find the sentence containing the original
           const sentences = editorText.split(/[.!?]+/);
-          const matchingSentence = sentences.find(s => 
-            s.toLowerCase().includes(originalText.toLowerCase())
+          const matchingSentence = sentences.find((s) =>
+            s.toLowerCase().includes(originalText.toLowerCase()),
           );
-          
+
           if (matchingSentence) {
             const sentenceIndex = editorText.indexOf(matchingSentence);
             const beforeSentence = editorText.substring(0, sentenceIndex);
-            const afterSentence = editorText.substring(sentenceIndex + matchingSentence.length);
+            const afterSentence = editorText.substring(
+              sentenceIndex + matchingSentence.length,
+            );
             correctedText = beforeSentence + finalText + afterSentence;
           } else {
             // Last resort: append the suggestion
@@ -231,41 +281,78 @@ function AIInsightsSidebar({
       }
 
       onApplyFix(correctedText);
-      
+
       // Dismiss the alert
       if (suggestionDialog.alert) {
         handleDismiss(suggestionDialog.alert._idx);
       }
-      
+
       setSuggestionDialog(null);
     } catch (error) {
       console.error("Failed to apply suggestion:", error);
     }
   };
 
+  const TabButton = ({ id, label, active }) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={cn(
+        "relative flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all",
+        active ? "text-[#5a5fd8]" : "text-[#888] hover:text-[#666]",
+      )}
+    >
+      {label}
+      {active && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#5a5fd8]" />
+      )}
+    </button>
+  );
+
   return (
     <aside
       className={cn(
-        "custom-scrollbar flex w-80 shrink-0 flex-col gap-6 overflow-y-auto border-l border-[#e8e8e0] bg-[#f8f7ff] p-4",
+        "custom-scrollbar flex w-80 shrink-0 flex-col gap-0 overflow-y-auto border-l border-[#e8e8e0] bg-[#f8f7ff]",
         className,
       )}
       {...props}
     >
-      <div>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#2e2e2e]">
-          AI Insights
-        </h2>
-        <p className="mt-1 text-xs text-[#888]">
-          {count} active alert{count !== 1 ? "s" : ""}
-        </p>
+      <div className="border-b border-[#e8e8e0] bg-white p-4 pb-0">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#2e2e2e]">
+              AI Insights
+            </h2>
+            <p className="mt-0.5 text-[10px] text-[#888]">
+              {totalCount} active alert{totalCount !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f0f2ff] text-[#5a5fd8]">
+            <span className="text-xs font-bold">{totalCount}</span>
+          </div>
+        </div>
+
+        <div className="flex gap-4">
+          <TabButton id="ALL" label="All" active={activeTab === "ALL"} />
+          <TabButton
+            id="POLISH"
+            label="Polish"
+            active={activeTab === "POLISH"}
+          />
+          <TabButton
+            id="NARRATIVE"
+            label="Narrative"
+            active={activeTab === "NARRATIVE"}
+          />
+        </div>
       </div>
 
-      <div className="space-y-4">
-        {visibleAlerts.map((alert) => {
+      <div className="flex-1 space-y-4 p-4">
+        {filteredAlerts.map((alert) => {
           const style = ALERT_STYLES[alert.type] ?? DEFAULT_STYLE;
           return (
             <InsightCard
               key={`${alert.type}-${alert._idx}-${(alert.explanation || "").slice(0, 20)}`}
+              id={alert.id}
               type={alert.type ?? "Alert"}
               subLabel={style.subLabel}
               headerBg={style.headerBg}
@@ -275,6 +362,7 @@ function AIInsightsSidebar({
               primaryAction={style.primaryAction}
               onDismiss={() => handleDismiss(alert._idx)}
               onFix={() => handleFix(alert)}
+              onHighlight={onHighlight}
               disabled={isFixing}
             />
           );

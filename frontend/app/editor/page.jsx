@@ -93,8 +93,8 @@ function EditorPageContent() {
           }}
           onEditorContentChange={setEditorContent}
         />
-        <AIInsightsSidebar 
-          className="hidden xl:flex" 
+        <AIInsightsSidebar
+          className="hidden xl:flex"
           alerts={alerts}
           projectId={projectId}
           editorContent={editorContent}
@@ -104,6 +104,11 @@ function EditorPageContent() {
               window.__editorApplyFix(correctedText);
             }
             setEditorContent(correctedText);
+          }}
+          onHighlight={(insightId) => {
+            if (window.__editorFocusHighlight) {
+              window.__editorFocusHighlight(insightId);
+            }
           }}
         />
       </div>

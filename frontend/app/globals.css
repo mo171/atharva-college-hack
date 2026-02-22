@@ -185,14 +185,32 @@
   /* --- INSIGHT HIGHLIGHTS --- */
   .insight-highlight {
     position: relative;
-    border-radius: 2px;
-    padding: 0 1px;
+    border-radius: 4px;
+    padding: 0 2px;
     cursor: help;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background-clip: padding-box;
   }
 
   .insight-highlight:hover {
-    filter: brightness(0.95);
+    filter: brightness(0.92);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .insight-highlight.highlight-focused {
+    animation: highlight-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    z-index: 10;
+  }
+
+  @keyframes highlight-pulse {
+    0%, 100% {
+      box-shadow: 0 0 0 0px rgba(90, 95, 216, 0.4);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 0 6px rgba(90, 95, 216, 0);
+      transform: scale(1.02);
+    }
   }
 
   /* Spelling - Red */
@@ -203,8 +221,8 @@
 
   /* Grammar - Blue */
   .insight-highlight-grammar {
-    background-color: #dbeafe;
-    border-bottom: 2px solid #3b82f6;
+    background-color: #e0e7ff;
+    border-bottom: 2px solid #5a5fd8;
   }
 
   /* Style - Yellow */
@@ -231,27 +249,50 @@
     position: absolute;
     bottom: 100%;
     left: 50%;
-    transform: translateX(-50%) translateY(-8px);
+    transform: translateX(-50%) translateY(-12px);
     background: #1e1e2e;
     color: white;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    white-space: pre-wrap;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: normal;
     width: max-content;
-    max-width: 200px;
-    z-index: 50;
+    max-width: 260px;
+    z-index: 100;
     opacity: 0;
     pointer-events: none;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    line-height: 1.4;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    line-height: 1.5;
     text-align: left;
     font-style: normal;
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .insight-highlight[data-tooltip]:hover::after {
-    opacity: 1;
+  /* Tooltip Arrow */
+  .insight-highlight[data-tooltip]::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
     transform: translateX(-50%) translateY(-4px);
+    border-width: 8px 8px 0 8px;
+    border-style: solid;
+    border-color: #1e1e2e transparent transparent transparent;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .insight-highlight[data-tooltip]:hover::after,
+  .insight-highlight[data-tooltip]:hover::before {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  
+  .insight-highlight[data-tooltip]:hover::before {
+    transform: translateX(-50%) translateY(0px);
   }
 }

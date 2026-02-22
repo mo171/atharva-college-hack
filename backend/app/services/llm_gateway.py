@@ -85,6 +85,8 @@ class InsightGenerator:
             "You are a professional copyeditor. Analyze the following text for grammar, punctuation, and flow issues. "
             "Return a list of alerts in the following format, separated by newlines:\n"
             "TYPE: [GRAMMAR|STYLE] | TEXT: [specific error clip] | EXPLANATION: [concise suggestion]\n\n"
+            "CRITICAL: The TEXT: field MUST contain the EXACT character-for-character clip from the original text (including punctuation and spaces). "
+            "DO NOT wrap the text clip in quotes, brackets, or any other characters. "
             "If no issues, return 'OK'.\n\n"
             f'Text: "{text}"'
         )
@@ -113,11 +115,31 @@ class InsightGenerator:
                     alert_type = part.replace("TYPE:", "").strip()
                 elif "TEXT:" in part:
                     original_text = part.replace("TEXT:", "").strip()
+                    # Strip common wrappers like [] or "" or '' if LLM added them
+                    if len(original_text) >= 2:
+                        if (
+                            (
+                                original_text.startswith("[")
+                                and original_text.endswith("]")
+                            )
+                            or (
+                                original_text.startswith('"')
+                                and original_text.endswith('"')
+                            )
+                            or (
+                                original_text.startswith("'")
+                                and original_text.endswith("'")
+                            )
+                        ):
+                            original_text = original_text[1:-1].strip()
                 elif "EXPLANATION:" in part:
                     explanation = part.replace("EXPLANATION:", "").strip()
 
+            import uuid
+
             alerts.append(
                 {
+                    "id": str(uuid.uuid4()),
                     "type": alert_type,
                     "entity": None,
                     "explanation": explanation,

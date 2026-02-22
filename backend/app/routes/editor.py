@@ -53,7 +53,9 @@ class FixSpellingRequest(BaseModel):
 class GrammarSuggestionRequest(BaseModel):
     project_id: str = Field(..., example="uuid-123-project")
     content: str = Field(..., example="Current story text...")
-    alert: Dict[str, Any] = Field(..., example={"type": "GRAMMAR", "original_text": "...", "explanation": "..."})
+    alert: Dict[str, Any] = Field(
+        ..., example={"type": "GRAMMAR", "original_text": "...", "explanation": "..."}
+    )
 
 
 class EntityResponse(BaseModel):
@@ -136,6 +138,7 @@ async def run_analysis(project_id: str, text_content: str) -> dict:
     ]
     alerts_out = [
         {
+            "id": item.get("log_id"),
             "type": "INCONSISTENCY",
             "entity": None,
             "explanation": item["alert"],
@@ -346,44 +349,45 @@ async def generate_suggestions(request: GenerateSuggestionsRequest):
     """
     try:
         content = request.content
-        
+
         # Fetch alerts by running analysis
         analysis_result = await run_analysis(
-            project_id=request.project_id,
-            text_content=content
+            project_id=request.project_id, text_content=content
         )
         alerts = analysis_result.get("alerts", [])
-        
+
         # Convert to dict format if needed
         alerts_dict = []
         for alert in alerts:
             if isinstance(alert, dict):
                 alerts_dict.append(alert)
             else:
-                alerts_dict.append({
-                    "type": getattr(alert, "type", "UNKNOWN"),
-                    "entity": getattr(alert, "entity", None),
-                    "explanation": getattr(alert, "explanation", ""),
-                    "original_text": getattr(alert, "original_text", None),
-                })
-        
+                alerts_dict.append(
+                    {
+                        "type": getattr(alert, "type", "UNKNOWN"),
+                        "entity": getattr(alert, "entity", None),
+                        "explanation": getattr(alert, "explanation", ""),
+                        "original_text": getattr(alert, "original_text", None),
+                    }
+                )
+
         # Generate corrected text using correction suite
         correction_suite = get_correction_suite()
         suggested_text = correction_suite.generate_corrected_text(content, alerts_dict)
-        
+
         return {
             "status": "success",
             "original_text": content,
             "suggested_text": suggested_text,
-            "alerts_applied": len(alerts_dict)
+            "alerts_applied": len(alerts_dict),
         }
     except Exception as e:
         print(f"Generate Suggestions Error: {e}")
         import traceback
+
         traceback.print_exc()
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate suggestions: {str(e)}"
+            status_code=500, detail=f"Failed to generate suggestions: {str(e)}"
         )
 
 
@@ -396,22 +400,15 @@ async def fix_spelling(request: FixSpellingRequest):
     try:
         correction_suite = get_correction_suite()
         corrected_text = correction_suite.apply_spelling_fix(
-            request.content,
-            request.word,
-            request.suggestion
+            request.content, request.word, request.suggestion
         )
-        return {
-            "status": "success",
-            "corrected_text": corrected_text
-        }
+        return {"status": "success", "corrected_text": corrected_text}
     except Exception as e:
         print(f"Fix Spelling Error: {e}")
         import traceback
+
         traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fix spelling: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fix spelling: {str(e)}")
 
 
 @router.post("/get-grammar-suggestion")
@@ -423,14 +420,14 @@ async def get_grammar_suggestion(request: GrammarSuggestionRequest):
     try:
         correction_suite = get_correction_suite()
         alert = request.alert
-        
+
         # Extract original text from alert
         original_text = alert.get("original_text", "")
         explanation = alert.get("explanation", "")
-        
+
         if not original_text:
             raise ValueError("Alert must contain original_text")
-        
+
         # Use LLM to generate grammar suggestion
         prompt = (
             f"You are a professional copyeditor. The following text has a grammar issue:\n\n"
@@ -440,26 +437,26 @@ async def get_grammar_suggestion(request: GrammarSuggestionRequest):
             f"maintaining the same meaning and style. Do not add explanations or markdown.\n\n"
             f"Corrected text:"
         )
-        
+
         response = correction_suite.generator.client.chat.completions.create(
             model=correction_suite.generator.model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
         )
-        
+
         suggested_text = (response.choices[0].message.content or original_text).strip()
-        
+
         return {
             "status": "success",
             "original_text": original_text,
             "suggested_text": suggested_text,
-            "explanation": explanation
+            "explanation": explanation,
         }
     except Exception as e:
         print(f"Get Grammar Suggestion Error: {e}")
         import traceback
+
         traceback.print_exc()
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get grammar suggestion: {str(e)}"
+            status_code=500, detail=f"Failed to get grammar suggestion: {str(e)}"
         )

@@ -53,7 +53,8 @@ class SuggestionService:
             "2. LOGIC: Ensure the suggestion aligns with RECENT EVENTS and ESTABLISHED FACTS.\n"
             "3. ADAPT: Match the vocabulary level and syntactic complexity found in the Anchors.\n"
             "4. SYNTHESIZE: Provide exactly ONE continuation sentence (max 15 words).\n"
-            "5. SEAMLESSNESS: The output must start exactly where the user left off.\n\n"
+            "5. SEAMLESSNESS: The output must start exactly where the user left off.\n"
+            "6. QUALITY: DO NOT repeat words, stutter, or use broken grammar (e.g., avoid 'iisss' or 'man man').\n\n"
             "OUTPUT FORMAT: Return only the continuation text. No quotes, no intro."
         )
 
@@ -67,7 +68,7 @@ class SuggestionService:
                         "content": f"CONTINUE THIS TEXT SEAMLESSLY:\n...{context_text[-1000:]}",
                     },
                 ],
-                temperature=0.8,
+                temperature=0.4,
                 max_tokens=40,
             )
             suggestion = response.choices[0].message.content.strip()
@@ -76,6 +77,31 @@ class SuggestionService:
             suggestion = suggestion.strip('"').strip("'")
             if suggestion.lower().startswith("suggestion:"):
                 suggestion = suggestion[11:].strip()
+
+            # Self-Correction: Catch obvious hallucinations or typos
+            try:
+                from .correction import get_correction_suite
+
+                suite = get_correction_suite()
+                spelling_alerts = suite.check_spelling(suggestion)
+                if spelling_alerts:
+                    for alert in spelling_alerts:
+                        original = alert.get("original_text", "")
+                        explanation = alert.get("explanation", "")
+                        if "Did you mean:" in explanation:
+                            # Extract first suggestion: "Did you mean: word, word?"
+                            sugg_part = (
+                                explanation.split("Did you mean:")[1]
+                                .split("?")[0]
+                                .strip()
+                            )
+                            first_fix = sugg_part.split(",")[0].strip()
+                            if first_fix:
+                                suggestion = suite.apply_spelling_fix(
+                                    suggestion, original, first_fix
+                                )
+            except Exception as e:
+                print(f"Self-correction failed: {e}")
 
             return suggestion
         except Exception as e:

@@ -1,5 +1,4 @@
 "use client";
-
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import {
   Bold,
@@ -61,7 +60,7 @@ function EditorContent({
       lastContentRef.current = text;
       setEditorText(text);
       setSyncStatus("Typing...");
-      
+
       // Notify parent of content change
       onEditorContentChange?.(text);
 
@@ -155,16 +154,23 @@ function EditorContent({
     [handleContentChange],
   );
 
-  // Expose apply fix handler to parent
+  const handleHighlight = useCallback((insightId) => {
+    if (editorContainerRef.current) {
+      editorContainerRef.current.focusHighlight(insightId);
+    }
+  }, []);
+
+  // Expose handlers to parent/sidebar
   useEffect(() => {
     if (onApplyFix) {
-      // Store the handler so it can be called from outside
       window.__editorApplyFix = handleApplyChanges;
     }
+    window.__editorFocusHighlight = handleHighlight;
     return () => {
       delete window.__editorApplyFix;
+      delete window.__editorFocusHighlight;
     };
-  }, [onApplyFix, handleApplyChanges]);
+  }, [onApplyFix, handleApplyChanges, handleHighlight]);
 
   useEffect(() => {
     return () => {
