@@ -142,3 +142,131 @@ export async function analyzeBehavior(projectId, file) {
   );
   return data;
 }
+
+/**
+ * Fetch plot thread data for a project.
+ * @param {string} projectId
+ * @returns {Promise<{ status: string, plot_threads: Array, plot_points: Array, connections: Array }>}
+ */
+export async function fetchPlotThread(projectId) {
+  const { data } = await api.get(`/plot-thread/${projectId}`);
+  return data;
+}
+
+/**
+ * Trigger AI extraction of plot points from narrative chunks.
+ * @param {string} projectId
+ * @returns {Promise<{ status: string, plot_points_created: number, thread_id: string }>}
+ */
+export async function extractPlotPoints(projectId) {
+  const { data } = await api.post(`/plot-thread/${projectId}/extract`);
+  return data;
+}
+
+/**
+ * Create a new plot thread.
+ * @param {{ projectId: string, title: string, description?: string, color?: string }}
+ * @returns {Promise<{ status: string, thread: Object }>}
+ */
+export async function createPlotThread({ projectId, title, description, color }) {
+  const { data } = await api.post(`/plot-thread/${projectId}/thread`, {
+    title,
+    description,
+    color: color || "#5a5fd8",
+  });
+  return data;
+}
+
+/**
+ * Create a new plot point.
+ * @param {{ projectId: string, plotThreadId?: string, title: string, description?: string, eventType?: string, timelinePosition: number, narrativeChunkId?: string, positionX?: number, positionY?: number }}
+ * @returns {Promise<{ status: string, point: Object }>}
+ */
+export async function createPlotPoint({
+  projectId,
+  plotThreadId,
+  title,
+  description,
+  eventType,
+  timelinePosition,
+  narrativeChunkId,
+  positionX,
+  positionY,
+}) {
+  const { data } = await api.post(`/plot-thread/${projectId}/point`, {
+    plot_thread_id: plotThreadId,
+    title,
+    description,
+    event_type: eventType || "OTHER",
+    timeline_position: timelinePosition,
+    narrative_chunk_id: narrativeChunkId,
+    position_x: positionX || 0,
+    position_y: positionY || 0,
+  });
+  return data;
+}
+
+/**
+ * Update a plot point.
+ * @param {{ pointId: string, title?: string, description?: string, eventType?: string, timelinePosition?: number, positionX?: number, positionY?: number }}
+ * @returns {Promise<{ status: string, point: Object }>}
+ */
+export async function updatePlotPoint({
+  pointId,
+  title,
+  description,
+  eventType,
+  timelinePosition,
+  positionX,
+  positionY,
+}) {
+  const { data } = await api.put(`/plot-thread/point/${pointId}`, {
+    title,
+    description,
+    event_type: eventType,
+    timeline_position: timelinePosition,
+    position_x: positionX,
+    position_y: positionY,
+  });
+  return data;
+}
+
+/**
+ * Delete a plot point.
+ * @param {string} pointId
+ * @returns {Promise<{ status: string, message: string }>}
+ */
+export async function deletePlotPoint(pointId) {
+  const { data } = await api.delete(`/plot-thread/point/${pointId}`);
+  return data;
+}
+
+/**
+ * Create a connection between two plot points.
+ * @param {{ fromPointId: string, toPointId: string, connectionType?: string, description?: string }}
+ * @returns {Promise<{ status: string, connection: Object }>}
+ */
+export async function createConnection({
+  fromPointId,
+  toPointId,
+  connectionType,
+  description,
+}) {
+  const { data } = await api.post("/plot-thread/connection", {
+    from_point_id: fromPointId,
+    to_point_id: toPointId,
+    connection_type: connectionType || "FOLLOWS",
+    description,
+  });
+  return data;
+}
+
+/**
+ * Delete a connection between plot points.
+ * @param {string} connectionId
+ * @returns {Promise<{ status: string, message: string }>}
+ */
+export async function deleteConnection(connectionId) {
+  const { data } = await api.delete(`/plot-thread/connection/${connectionId}`);
+  return data;
+}

@@ -5,6 +5,7 @@ from config import settings
 from routes import project as project_routes
 from routes import editor as editor_routes
 from routes import ws_editor as ws_editor_routes
+from routes import plot_thread as plot_thread_routes
 
 app = FastAPI(title="Engine")
 
@@ -19,6 +20,7 @@ app.add_middleware(
 app.include_router(project_routes.router)
 app.include_router(editor_routes.router)
 app.include_router(ws_editor_routes.router)
+app.include_router(plot_thread_routes.router)
 
 
 @app.get("/health")

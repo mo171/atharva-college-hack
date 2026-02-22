@@ -1,90 +1,103 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
-import { getGhostSuggestion } from "@/lib/api";
+import { useRef, useEffect, useCallback, useMemo, useState } from "react";
+import {
+  Bold,
+  Italic,
+  Underline,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  List,
+  User,
+  FileText,
+  Clock,
+  Zap,
+  GitCompare,
+} from "lucide-react";
 
-import { EditorCanvas } from "@/features/editor/components/EditorCanvas";
+import { Button } from "@/app/components/ui/button";
+import { EditorContainer } from "@/features/editor";
+import { ComparisonView } from "./ComparisonView";
+import { cn } from "@/lib/utils";
+import { analyzeWriting, saveWriting, generateSuggestions } from "@/lib/api";
 
-const DEFAULT_HTML = `<p>Elias descended the worn stone steps, the smell of dried herbs and decay thickening with each step. The apothecary's cellar had always felt like a threshold between worlds—half laboratory, half crypt.</p><p><span class="insight-highlight insight-highlight-grammar" data-tooltip="This sentence has a complex structure. Consider shortening it for better flow.">He remembered the sunlit garden outside, a stark contrast to the darkness he now inhabited.</span> The memory felt distant, almost belonging to another man.</p><p><span class="insight-highlight insight-highlight-style" data-tooltip="This action feels abrupt. You might want to describe Elias's physical reaction to the draft.">He stood up and looked around the room, wondering where the potion could have gone.</span> The shelves were lined with amber bottles, their labels faded beyond recognition. None of them resembled what he had come for.</p><p>A faint draft stirred the dust. Elias turned, but the shadows yielded <span class="insight-highlight insight-highlight-spelling" data-tooltip="Possible typo: 'nothin'. Did you mean: nothing, notion, north?">nothin</span>. The silence was total—the kind of silence that seemed to listen.</p>`;
+function EditorContent({
+  projectId,
+  alerts,
+  onAnalysis,
+  onStoryBrainRefresh,
+  className,
+  ...props
+}) {
+  const debounceRef = useRef(null);
+  const lastContentRef = useRef("");
+  const [editorText, setEditorText] = useState("");
+  const [syncStatus, setSyncStatus] = useState("Idle");
+  const [chapter, setChapter] = useState("Chapter Five:");
+  const [title, setTitle] = useState("The Apothecary's Silence");
 
-function EditorContainer({ onContentChange, alerts, className, ...props }) {
-  const editorRef = useRef(null);
-  const [isEmpty, setIsEmpty] = useState(false);
-  const hasInitialized = useRef(false);
-  const [suggestion, setSuggestion] = useState("");
-  const idleTimerRef = useRef(null);
-  const searchParams = useSearchParams();
-  const projectId = searchParams.get("projectId");
+  const wordCount = useMemo(() => {
+    const words = editorText.trim().split(/\s+/).filter(Boolean);
+    return words.length;
+  }, [editorText]);
 
-  const checkEmpty = useCallback(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    const text = el.innerText?.trim() ?? "";
-    setIsEmpty(text.length === 0);
-  }, []);
+  const readingMinutes = useMemo(() => {
+    if (!wordCount) return 0;
+    return Math.max(1, Math.ceil(wordCount / 200));
+  }, [wordCount]);
 
-  const handleInput = useCallback(() => {
-    checkEmpty();
-    const el = editorRef.current;
-    if (el && onContentChange) {
-      onContentChange(el.innerText ?? "");
-    }
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isComparing, setIsComparing] = useState(false);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [comparisonData, setComparisonData] = useState(null);
+  const editorContainerRef = useRef(null);
 
-    // --- MESO (GHOST TEXT) TRIGGER ---
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    setSuggestion(""); // Clear existing suggestion on type
+  const handleContentChange = useCallback(
+    (text) => {
+      if (!projectId || !text?.trim()) return;
+      lastContentRef.current = text;
+      setEditorText(text);
+      setSyncStatus("Typing...");
 
-    idleTimerRef.current = setTimeout(async () => {
-      if (!el || !projectId) return;
-      const text = el.innerText || "";
-      const lastWords = text.split(/\s+/).slice(-200).join(" ");
-
-      try {
-        const res = await getGhostSuggestion({ projectId, content: lastWords });
-        if (res.status === "success" && res.suggestion) {
-          setSuggestion(res.suggestion);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(async () => {
+        debounceRef.current = null;
+        try {
+          // Auto-save only, no analysis
+          setSyncStatus("Analyzing...");
+          await saveWriting({
+            projectId,
+            content: lastContentRef.current,
+          });
+          onStoryBrainRefresh?.();
+          setSyncStatus("Synced");
+        } catch (err) {
+          console.error("Auto-save failed:", err);
+          setSyncStatus("Sync error");
         }
-      } catch (err) {
-        console.error("Ghost suggestion error:", err);
-      }
-    }, 2000);
-  }, [checkEmpty, onContentChange, projectId]);
+      }, 900); // 2 second debounce for auto-save
+    },
+    [projectId, onAnalysis, onStoryBrainRefresh],
+  );
 
-  // Handle Tab key to commit suggestion
-  useEffect(() => {
-    const el = editorRef.current;
-    if (!el) return;
+  const handleManualAnalyze = async () => {
+    if (!projectId || !lastContentRef.current.trim() || isAnalyzing) return;
 
-    const handleKeyDown = (e) => {
-      if (e.key === "Tab" && suggestion) {
-        e.preventDefault();
-
-        // Simple implementation: append to end or cursor
-        // For contenteditable, we can append to innerText
-        const currentText = el.innerText || "";
-        const newText = currentText.endsWith(" ")
-          ? currentText + suggestion
-          : currentText + " " + suggestion;
-
-        // This is a destructive update, in production use Document fragments or selection API
-        el.innerText = newText;
-        setSuggestion("");
-        if (onContentChange) onContentChange(newText);
-
-        // Focus end
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(el);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
-    };
-
-    el.addEventListener("keydown", handleKeyDown);
-    return () => el.removeEventListener("keydown", handleKeyDown);
-  }, [suggestion, onContentChange]);
+    setIsAnalyzing(true);
+    try {
+      const payload = await analyzeWriting({
+        projectId,
+        content: lastContentRef.current,
+      });
+      onAnalysis?.(payload);
+      onStoryBrainRefresh?.();
+    } catch (err) {
+      console.error("Manual analysis failed:", err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const handleCompare = async () => {
     if (!projectId || !lastContentRef.current.trim() || isComparing) return;
@@ -138,146 +151,149 @@ function EditorContainer({ onContentChange, alerts, className, ...props }) {
   );
 
   useEffect(() => {
-    const el = editorRef.current;
-    if (!el) return;
-
-    // Remove previously injected highlights before applying fresh ones.
-    // This avoids nested spans and stale coloring when alerts change.
-    const previousHighlights = el.querySelectorAll("span.insight-highlight");
-    previousHighlights.forEach((span) => {
-      const textNode = document.createTextNode(span.textContent || "");
-      span.replaceWith(textNode);
-    });
-    el.normalize();
-
-    if (!alerts || alerts.length === 0) return;
-
-    // Helper to map alert types to CSS classes
-    const getHighlightClass = (type) => {
-      switch (type?.toUpperCase()) {
-        case "SPELLING":
-          return "insight-highlight-spelling";
-        case "GRAMMAR":
-        case "PUNCTUATION":
-        case "STYLE":
-          return "insight-highlight-grammar";
-        case "INCONSISTENCY":
-          return "insight-highlight-inconsistency";
-        default:
-          return "insight-highlight-grammar";
-      }
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-
-    const seen = new Set();
-    const filteredAlerts = alerts.filter((alert) => {
-      const originalText = (alert?.original_text || "").trim();
-      if (!originalText) return false;
-      const key = `${(alert?.type || "").toUpperCase()}|${originalText}|${alert?.explanation || ""}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    const getTextNodes = (root) => {
-      const nodes = [];
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-        acceptNode: (node) => {
-          const value = node.nodeValue || "";
-          if (!value.trim()) return NodeFilter.FILTER_REJECT;
-          if (node.parentElement?.closest(".insight-highlight")) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        },
-      });
-
-      while (walker.nextNode()) {
-        nodes.push(walker.currentNode);
-      }
-      return nodes;
-    };
-
-    const highlightText = (root, text, highlightClass, tooltipText) => {
-      const target = text.toLowerCase();
-      const nodes = getTextNodes(root);
-
-      nodes.forEach((node) => {
-        const source = node.nodeValue || "";
-        const lowerSource = source.toLowerCase();
-        let cursor = 0;
-        let matchIndex = lowerSource.indexOf(target, cursor);
-
-        if (matchIndex === -1) return;
-
-        const fragment = document.createDocumentFragment();
-        while (matchIndex !== -1) {
-          if (matchIndex > cursor) {
-            fragment.appendChild(
-              document.createTextNode(source.slice(cursor, matchIndex)),
-            );
-          }
-
-          const matchedText = source.slice(
-            matchIndex,
-            matchIndex + text.length,
-          );
-          const span = document.createElement("span");
-          span.className = `insight-highlight ${highlightClass}`;
-          span.dataset.insightId = Math.random().toString(36).slice(2, 11);
-          span.dataset.tooltip = tooltipText || "";
-          span.textContent = matchedText;
-          fragment.appendChild(span);
-
-          cursor = matchIndex + text.length;
-          matchIndex = lowerSource.indexOf(target, cursor);
-        }
-
-        if (cursor < source.length) {
-          fragment.appendChild(document.createTextNode(source.slice(cursor)));
-        }
-        node.parentNode?.replaceChild(fragment, node);
-      });
-    };
-
-    filteredAlerts.forEach((alert) => {
-      const originalText = alert.original_text.trim();
-      const highlightClass = getHighlightClass(alert.type);
-      const tooltipText = alert.explanation || "";
-      highlightText(el, originalText, highlightClass, tooltipText);
-    });
-  }, [alerts]);
-
-  useEffect(() => {
-    const el = editorRef.current;
-    if (!el || hasInitialized.current) return;
-    hasInitialized.current = true;
-    el.innerHTML = DEFAULT_HTML;
-    // setIsEmpty(false);
-    requestAnimationFrame(() => {
-      el.focus();
-    });
   }, []);
 
   return (
-    <div className="relative">
-      <EditorCanvas
-        editorRef={editorRef}
-        initialHtml={DEFAULT_HTML}
-        onInput={handleInput}
-        placeholder="Start writing your story..."
-        isEmpty={isEmpty}
-        className={className}
-        {...props}
-      />
-      {suggestion && (
-        <div className="pointer-events-none absolute right-10 bottom-10 max-w-xs animate-in fade-in slide-in-from-bottom-2 bg-white/80 backdrop-blur p-3 rounded-lg border border-[#ced3ff] shadow-sm text-sm text-[#4a4a7a] italic">
-          <span className="text-xs font-bold text-[#ced3ff] block mb-1 uppercase tracking-widest">
-            Ghost Suggestion (Tab to Accept)
-          </span>
-          <span>&ldquo;{suggestion}&rdquo;</span>
-        </div>
+    <main
+      className={cn(
+        "flex flex-1 flex-col overflow-auto bg-[#fffff2] p-8",
+        className,
       )}
-    </div>
+      {...props}
+    >
+      <div className="mx-auto w-full max-w-3xl">
+        {/* Toolbar */}
+        <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-[#e8e8e0] pb-4">
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Bold className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Italic className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Underline className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="h-4 w-px bg-[#e8e8e0]" />
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <AlignLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <AlignCenter className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <AlignRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <List className="h-4 w-4" />
+          </Button>
+          <Button
+            onClick={handleManualAnalyze}
+            disabled={isAnalyzing}
+            className={cn(
+              "gap-2 rounded-xl px-4 py-2 text-sm transition-all",
+              isAnalyzing
+                ? "bg-[#e8ecff] text-[#888]"
+                : "bg-[#5a5fd8] text-white hover:bg-[#4a4fcf] shadow-md shadow-[#5a5fd8]/20",
+            )}
+          >
+            <Zap
+              className={cn("h-3.5 w-3.5", isAnalyzing && "animate-pulse")}
+            />
+            {isAnalyzing ? "ANALYZING..." : "ANALYZE"}
+          </Button>
+          <Button
+            onClick={handleCompare}
+            disabled={isComparing || !lastContentRef.current.trim()}
+            className={cn(
+              "gap-2 rounded-xl px-4 py-2 text-sm transition-all",
+              isComparing
+                ? "bg-[#e8ecff] text-[#888]"
+                : "bg-[#ced3ff] text-[#4a4a7a] hover:bg-[#b8bff5] shadow-sm",
+            )}
+          >
+            <GitCompare
+              className={cn("h-3.5 w-3.5", isComparing && "animate-pulse")}
+            />
+            {isComparing ? "COMPARING..." : "COMPARE"}
+          </Button>
+          <div className="h-4 w-px bg-[#e8e8e0]" />
+          <Button className="gap-2 rounded-xl bg-[#ced3ff] px-4 py-2 text-sm text-[#4a4a7a] transition-colors hover:bg-[#b8bff5]">
+            <User className="h-3.5 w-3.5" />
+            POV: ELIAS
+          </Button>
+          <Button className="gap-2 rounded-xl bg-[#ced3ff] px-4 py-2 text-sm text-[#4a4a7a] transition-colors hover:bg-[#b8bff5]">
+            STYLE GUIDE
+          </Button>
+        </div>
+
+        {/* Chapter title */}
+        <div className="mb-2 flex flex-col">
+          <input
+            type="text"
+            value={chapter}
+            onChange={(e) => setChapter(e.target.value)}
+            className="w-full border-none bg-transparent p-0 text-2xl font-semibold text-[#2e2e2e] focus:outline-none focus:ring-0"
+            placeholder="Chapter..."
+          />
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full border-none bg-transparent p-0 text-4xl font-bold text-[#5a5fd8] focus:outline-none focus:ring-0"
+            placeholder="Title..."
+          />
+        </div>
+        <div className="mb-8 flex gap-6 text-xs text-[#888]">
+          <span className="flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5" />
+            {wordCount.toLocaleString()} words
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" />6 min read
+          </span>
+        </div>
+
+        {/* Chapter body */}
+        <div className="space-y-4 text-[15px] leading-relaxed text-[#2e2e2e]">
+          <EditorContainer
+            ref={editorContainerRef}
+            onContentChange={handleContentChange}
+            alerts={alerts}
+          />
+        </div>
+
+        {/* Comparison Modal */}
+        {comparisonData && (
+          <ComparisonView
+            open={comparisonOpen}
+            onOpenChange={setComparisonOpen}
+            originalText={comparisonData.original}
+            suggestedText={comparisonData.suggested}
+            onApply={handleApplyChanges}
+          />
+        )}
+
+        {/* Footer */}
+        <div className="mt-12 flex flex-wrap gap-2 text-[11px] text-[#888]">
+          <span>DRAFT 0.4.2</span>
+          <span>•</span>
+          <span>SYNC: {syncStatus.toLowerCase()}</span>
+
+          <span>•</span>
+          <span>READING LEVEL: GRADE 9</span>
+
+          <span>•</span>
+          <span>SENTIMENT: 42% SUSPENSE</span>
+        </div>
+      </div>
+    </main>
   );
 }
 

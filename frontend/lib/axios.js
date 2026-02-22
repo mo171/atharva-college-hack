@@ -29,7 +29,33 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error("API Error:", error.response?.data || error.message);
+    // Only log if there's meaningful error information
+    if (error.response) {
+      const errorData = error.response.data;
+      const errorMessage = error.message;
+      const status = error.response.status;
+      const url = error.config?.url;
+      
+      // Log meaningful error information
+      if (errorData && Object.keys(errorData).length > 0) {
+        console.error("API Error:", {
+          status,
+          url,
+          data: errorData,
+          message: errorMessage,
+        });
+      } else if (errorMessage) {
+        console.error("API Error:", {
+          status,
+          url,
+          message: errorMessage,
+        });
+      }
+      // If no meaningful data, don't log empty object
+    } else if (error.message) {
+      // Network error or other non-HTTP error
+      console.error("API Error (Network):", error.message);
+    }
     return Promise.reject(error);
   },
 );

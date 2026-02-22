@@ -1,17 +1,22 @@
+"use client";
+
 import Link from "next/link";
-import { Search, Cloud, Settings } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Search, Cloud, Settings, GitBranch } from "lucide-react";
 
 import { Input } from "@/app/components/ui/input";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
-  { href: "#", label: "File" },
-  { href: "#", label: "Edit" },
-  { href: "#", label: "Story Brain", isActive: true },
-  { href: "#", label: "Insights" },
-];
-
 function EditorNavbar({ className, ...props }) {
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get("projectId");
+  
+  const NAV_ITEMS = [
+    { href: "#", label: "File" },
+    { href: "#", label: "Edit" },
+    { href: "#", label: "Story Brain", isActive: true },
+    { href: "#", label: "Insights" },
+  ];
   return (
     <header
       className={cn(
@@ -49,6 +54,15 @@ function EditorNavbar({ className, ...props }) {
               {item.label}
             </Link>
           ))}
+          {projectId && (
+            <Link
+              href={`/plot-thread?projectId=${projectId}`}
+              className="text-sm font-medium text-[#2e2e2e] transition-colors hover:text-[#5a5fd8] flex items-center gap-1.5"
+            >
+              <GitBranch className="h-3.5 w-3.5" />
+              Plot Thread
+            </Link>
+          )}
         </nav>
       </div>
       <div className="flex items-center gap-4">
