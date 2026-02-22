@@ -38,6 +38,11 @@ class SuggestionRequest(BaseModel):
     content: str = Field(..., example="Current story text context...")
 
 
+class GenerateSuggestionsRequest(BaseModel):
+    project_id: str = Field(..., example="uuid-123-project")
+    content: str = Field(..., example="Current story text...")
+
+
 class EntityResponse(BaseModel):
     name: str
 
@@ -318,3 +323,52 @@ async def get_editing_suggestion(request: SuggestionRequest):
     except Exception as e:
         print(f"Graph-Aware Ghost Text Error: {e}")
         return {"status": "error", "suggestion": ""}
+
+
+@router.post("/generate-suggestions")
+async def generate_suggestions(request: GenerateSuggestionsRequest):
+    """
+    Generate a suggested version of the text by applying all AI insights.
+    Returns both original and suggested text for side-by-side comparison.
+    """
+    try:
+        content = request.content
+        
+        # Fetch alerts by running analysis
+        analysis_result = await run_analysis(
+            project_id=request.project_id,
+            text_content=content
+        )
+        alerts = analysis_result.get("alerts", [])
+        
+        # Convert to dict format if needed
+        alerts_dict = []
+        for alert in alerts:
+            if isinstance(alert, dict):
+                alerts_dict.append(alert)
+            else:
+                alerts_dict.append({
+                    "type": getattr(alert, "type", "UNKNOWN"),
+                    "entity": getattr(alert, "entity", None),
+                    "explanation": getattr(alert, "explanation", ""),
+                    "original_text": getattr(alert, "original_text", None),
+                })
+        
+        # Generate corrected text using correction suite
+        correction_suite = get_correction_suite()
+        suggested_text = correction_suite.generate_corrected_text(content, alerts_dict)
+        
+        return {
+            "status": "success",
+            "original_text": content,
+            "suggested_text": suggested_text,
+            "alerts_applied": len(alerts_dict)
+        }
+    except Exception as e:
+        print(f"Generate Suggestions Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate suggestions: {str(e)}"
+        )

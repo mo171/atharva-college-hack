@@ -103,6 +103,29 @@ export async function getGhostSuggestion({ projectId, content }) {
 }
 
 /**
+ * Generate suggested text by applying all AI insights.
+ * @param {{ projectId: string, content: string }}
+ * @returns {Promise<{ status: string, original_text: string, suggested_text: string, alerts_applied: number }>}
+ */
+export async function generateSuggestions({ projectId, content }) {
+  try {
+    const { data } = await api.post("/editor/generate-suggestions", {
+      project_id: projectId,
+      content,
+    });
+    return data;
+  } catch (error) {
+    console.error("Generate suggestions API error:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: error.config?.url,
+    });
+    throw error;
+  }
+}
+
+/**
  * Upload a PDF/TXT for behavioral style analysis.
  */
 export async function analyzeBehavior(projectId, file) {

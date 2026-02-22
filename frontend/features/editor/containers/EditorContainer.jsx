@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import { useSearchParams } from "next/navigation";
 import { getGhostSuggestion } from "@/lib/api";
 
@@ -8,7 +8,7 @@ import { EditorCanvas } from "../components/EditorCanvas";
 
 const DEFAULT_HTML = `<p>Elias descended the worn stone steps, the smell of dried herbs and decay thickening with each step. The apothecary's cellar had always felt like a threshold between worlds—half laboratory, half crypt.</p><p><span class="insight-highlight insight-highlight-grammar" data-tooltip="This sentence has a complex structure. Consider shortening it for better flow.">He remembered the sunlit garden outside, a stark contrast to the darkness he now inhabited.</span> The memory felt distant, almost belonging to another man.</p><p><span class="insight-highlight insight-highlight-style" data-tooltip="This action feels abrupt. You might want to describe Elias's physical reaction to the draft.">He stood up and looked around the room, wondering where the potion could have gone.</span> The shelves were lined with amber bottles, their labels faded beyond recognition. None of them resembled what he had come for.</p><p>A faint draft stirred the dust. Elias turned, but the shadows yielded <span class="insight-highlight insight-highlight-spelling" data-tooltip="Possible typo: 'nothin'. Did you mean: nothing, notion, north?">nothin</span>. The silence was total—the kind of silence that seemed to listen.</p>`;
 
-function EditorContainer({ onContentChange, alerts, className, ...props }) {
+const EditorContainer = forwardRef(function EditorContainer({ onContentChange, alerts, className, ...props }, ref) {
   const editorRef = useRef(null);
   const [isEmpty, setIsEmpty] = useState(false);
   const hasInitialized = useRef(false);
@@ -16,6 +16,27 @@ function EditorContainer({ onContentChange, alerts, className, ...props }) {
   const idleTimerRef = useRef(null);
   const searchParams = useSearchParams();
   const projectId = searchParams.get("projectId");
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    setContent: (text) => {
+      const el = editorRef.current;
+      if (el) {
+        // Convert plain text to HTML paragraphs
+        const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
+        const html = paragraphs.map(p => `<p>${p.trim().replace(/\n/g, '<br>')}</p>`).join('');
+        el.innerHTML = html || '<p></p>';
+        setIsEmpty(!text.trim());
+        if (onContentChange) {
+          onContentChange(text);
+        }
+      }
+    },
+    getContent: () => {
+      const el = editorRef.current;
+      return el ? el.innerText : "";
+    }
+  }));
 
   const checkEmpty = useCallback(() => {
     const el = editorRef.current;
@@ -171,6 +192,6 @@ function EditorContainer({ onContentChange, alerts, className, ...props }) {
       )}
     </div>
   );
-}
+});
 
 export { EditorContainer };
