@@ -6,7 +6,7 @@ import { AlertTriangle, Wand2, Target, Square, FileText } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { SuggestionDialog } from "./SuggestionDialog";
 import { cn } from "@/lib/utils";
-import { fixSpelling, getGrammarSuggestion } from "@/lib/api";
+import { getGrammarSuggestion } from "@/lib/api";
 
 const ALERT_STYLES = {
   INCONSISTENCY: {
@@ -169,47 +169,8 @@ function AIInsightsSidebar({
 
     const alertType = alert.type;
 
-    // Handle spelling errors - direct fix
-    if (alertType === "SPELLING") {
-      setIsFixing(true);
-      try {
-        const originalWord = alert.original_text || "";
-        const explanation = alert.explanation || "";
-
-        // Extract suggestion from explanation
-        let suggestion = "";
-        if (explanation.includes("Did you mean:")) {
-          const suggestionsText = explanation
-            .split("Did you mean:")[1]
-            .split("?")[0]
-            .trim();
-          suggestion = suggestionsText.split(",")[0].trim();
-        }
-
-        if (!suggestion) {
-          console.error("No suggestion found for spelling error");
-          return;
-        }
-
-        const result = await fixSpelling({
-          projectId,
-          content: editorContent,
-          word: originalWord,
-          suggestion: suggestion,
-        });
-
-        if (result.status === "success" && onApplyFix) {
-          onApplyFix(result.corrected_text);
-          handleDismiss(alert._idx);
-        }
-      } catch (error) {
-        console.error("Failed to fix spelling:", error);
-      } finally {
-        setIsFixing(false);
-      }
-    }
-    // Handle grammar errors - show suggestion dialog
-    else if (alertType === "GRAMMAR" || alertType === "STYLE") {
+    // Handle Polish errors (Spelling, Grammar, Style) - show suggestion dialog
+    if (["SPELLING", "GRAMMAR", "STYLE"].includes(alertType)) {
       setIsFixing(true);
       try {
         const result = await getGrammarSuggestion({
@@ -228,7 +189,7 @@ function AIInsightsSidebar({
           });
         }
       } catch (error) {
-        console.error("Failed to get grammar suggestion:", error);
+        console.error("Failed to get suggestion:", error);
       } finally {
         setIsFixing(false);
       }

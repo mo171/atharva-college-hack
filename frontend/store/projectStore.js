@@ -24,6 +24,25 @@ export const useProjectStore = create(
 
       setCurrentProject: (project) => set({ currentProject: project }),
 
+      deleteProject: async (projectId) => {
+        try {
+          const { deleteProject: apiDeleteProject } = await import("@/lib/api");
+          await apiDeleteProject(projectId);
+          set((state) => ({
+            projects: state.projects.filter((p) => p.id !== projectId),
+            currentProject:
+              state.currentProject?.id === projectId
+                ? null
+                : state.currentProject,
+          }));
+          // Also clear from cache
+          get().clearCache(projectId);
+        } catch (err) {
+          set({ error: err.message });
+          throw err;
+        }
+      },
+
       updateEditorCache: (projectId, content) => {
         set((state) => ({
           editorCache: {

@@ -1,13 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, Plus, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
 
+import { useProjectStore } from "@/store/projectStore";
 import { Badge } from "@/app/components/ui/badge";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { Progress } from "@/app/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 function ProjectCardProject({
+  id,
   title,
   genre,
   lastEdited,
@@ -18,6 +21,22 @@ function ProjectCardProject({
   className,
   ...props
 }) {
+  const { deleteProject } = useProjectStore();
+
+  const handleDelete = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (confirm(`Are you sure you want to delete "${title}"?`)) {
+      try {
+        await deleteProject(id);
+        toast.success("Project deleted successfully");
+      } catch (err) {
+        toast.error("Failed to delete project");
+      }
+    }
+  };
+
   return (
     <Link href={href}>
       <Card
@@ -41,12 +60,22 @@ function ProjectCardProject({
           >
             {genre}
           </Badge>
+          <button
+            onClick={handleDelete}
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-red-500/80 text-white opacity-0 transition-opacity duration-300 hover:bg-red-600 group-hover:opacity-100 shadow-sm"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
         <CardContent className="flex flex-1 flex-col justify-between p-5">
           <div className="space-y-4">
             <div>
-              <h3 className="font-playfair text-xl font-medium tracking-tight text-slate-900 line-clamp-1 mb-1">{title}</h3>
-              <p className="text-[11px] text-slate-500 font-medium">{lastEdited}</p>
+              <h3 className="font-playfair text-xl font-medium tracking-tight text-slate-900 line-clamp-1 mb-1">
+                {title}
+              </h3>
+              <p className="text-[11px] text-slate-500 font-medium">
+                {lastEdited}
+              </p>
             </div>
 
             <div>
@@ -68,10 +97,10 @@ function ProjectCardProject({
           </div>
 
           <div className="flex justify-between items-center mt-5 pt-3 border-t border-slate-50">
-            <span className="text-[10px] text-slate-400 font-medium">Open Manuscript</span>
-            <div
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-50 text-slate-600 transition-all duration-300 group-hover:bg-slate-900 group-hover:text-white"
-            >
+            <span className="text-[10px] text-slate-400 font-medium">
+              Open Manuscript
+            </span>
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-50 text-slate-600 transition-all duration-300 group-hover:bg-slate-900 group-hover:text-white">
               <ArrowRight className="h-3.5 w-3.5" />
             </div>
           </div>

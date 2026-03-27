@@ -9,6 +9,7 @@ networkx
 pydantic
 httpx
 pytest
+hypothesis
 pyspellchecker
 sentence-transformers
 transformers
@@ -17,3 +18,4 @@ numpy
 pymupdf
 scikit-learn
 python-multipart
+cachetools

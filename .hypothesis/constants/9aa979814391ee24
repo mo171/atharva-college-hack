@@ -1,0 +1,4 @@
+# file: C:\movin\programing\3_projects\projects\atharva college\backend\app\services\analysis.py
+# hypothesis_version: 6.151.9
+
+['BE', 'CHARACTER', 'DWELL', 'HAS', 'IN', 'INCONSISTENCY', 'IS', 'LIVE', 'LOCATED', 'LOCATION', 'MEDIUM', 'OBJECT', 'OWN', 'PENDING', 'POSSESS', 'RELATED_TO', 'STAY', 'StoryKnowledgeGraph', 'WAS', 'consistency_logs', 'description', 'entities', 'entity_a_id', 'entity_b_id', 'entity_type', 'explanation', 'id', 'id,name', 'id,name,entity_type', 'involved_entity_ids', 'is_initial_setup', 'issue_type', 'name', 'node_type', 'object', 'original_text', 'project_id', 'relation', 'relation_type', 'relationships', 'sentence', 'severity', 'status', 'subject', 'suggested_fix']

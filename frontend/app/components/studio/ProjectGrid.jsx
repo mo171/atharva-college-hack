@@ -35,6 +35,7 @@ function ProjectGrid({ className, ...props }) {
       {projects.map((project) => (
         <ProjectCard
           key={project.id}
+          id={project.id}
           variant="project"
           title={project.title}
           genre={project.genre || "GENERAL"}

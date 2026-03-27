@@ -4,15 +4,8 @@ from typing import List, Optional, Dict, Any
 
 from lib.supabase import supabase_client
 from services.analysis import StoryKnowledgeGraph
-from services.extraction import (
-    ENTITY_LABEL_MAP,
-    ExtractionStore,
-    # build_nlp_pipeline,
-    get_cached_nlp_pipeline,
-    run_core_nlp_pipeline,
-)
-from services.llm_gateway import get_embedding, SupabaseInsightService
-from services.character_summary import update_character_summary
+from services.analysis_orchestrator import AnalysisOrchestrator
+from services.kg_cache import get_kg_cache
 from services.correction import get_correction_suite
 from services.suggestion import get_suggestion_service
 
@@ -43,13 +36,6 @@ class GenerateSuggestionsRequest(BaseModel):
     content: str = Field(..., example="Current story text...")
 
 
-class FixSpellingRequest(BaseModel):
-    project_id: str = Field(..., example="uuid-123-project")
-    content: str = Field(..., example="Current story text...")
-    word: str = Field(..., example="teh")
-    suggestion: str = Field(..., example="the")
-
-
 class GrammarSuggestionRequest(BaseModel):
     project_id: str = Field(..., example="uuid-123-project")
     content: str = Field(..., example="Current story text...")
@@ -77,123 +63,27 @@ class AnalysisResponse(BaseModel):
     detected_actions: List[Dict[str, Any]]
 
 
-# --- SHARED ANALYSIS LOGIC ---
-
-
-async def run_analysis(project_id: str, text_content: str) -> dict:
-    """
-    Run the full analysis pipeline: extraction, persistence, KG update, insight generation.
-    Returns the same dict shape as AnalysisResponse for use by HTTP and WebSocket routes.
-    """
-    nlp = get_cached_nlp_pipeline(model_name="en_core_web_sm", enable_coref=False)
-    result = run_core_nlp_pipeline(text_content, nlp)
-
-    embedding = None
-    try:
-        embedding = get_embedding(result.normalized_text)
-    except Exception:
-        pass
-
-    store = ExtractionStore(project_id=project_id, supabase_client=supabase_client)
-    store.upsert_entities(result.entities)
-    store.insert_narrative_chunk(content=result.normalized_text, embedding=embedding)
-
-    kg = StoryKnowledgeGraph.from_supabase(
-        project_id=project_id, supabase_client=supabase_client
-    )
-    kg.apply_svo_triples(result.triples, persist=True, original_text=text_content)
-
-    insight_service = SupabaseInsightService(project_id=project_id)
-    alerts_data = insight_service.process_pending_logs()
-
-    # Update character persona/story summaries for CHARACTERs in this chunk (real-time)
-    character_names = [
-        e["text"].strip()
-        for e in result.entities
-        if e["text"].strip()
-        and ENTITY_LABEL_MAP.get(e.get("label", ""), "OBJECT") == "CHARACTER"
-    ]
-    unique_character_names = list(set(character_names))
-    if unique_character_names:
-        char_entities = (
-            supabase_client.table("entities")
-            .select("id")
-            .eq("project_id", project_id)
-            .eq("entity_type", "CHARACTER")
-            .in_("name", unique_character_names[:5])
-            .execute()
-        )
-        for row in char_entities.data or []:
-            try:
-                update_character_summary(
-                    project_id=project_id,
-                    entity_id=row["id"],
-                    supabase_client=supabase_client,
-                )
-            except Exception:
-                pass
-
-    entities_out = [
-        {"name": e["text"], "type": e.get("label", "OBJECT")} for e in result.entities
-    ]
-    alerts_out = [
-        {
-            "id": item.get("log_id"),
-            "type": "INCONSISTENCY",
-            "entity": None,
-            "explanation": item["alert"],
-            "original_text": item.get("original_text"),
-        }
-        for item in alerts_data
-    ]
-
-    # --- MICRO (THE POLISH) ---
-    correction_suite = get_correction_suite()
-    polish_alerts = correction_suite.analyze_polish(text_content)
-    alerts_out.extend(polish_alerts)
-
-    detected_actions = [
-        {
-            "subject": t.subject,
-            "relation": t.relation,
-            "object": t.object,
-            "sentence": t.sentence,
-        }
-        for t in result.triples
-    ]
-
-    return {
-        "status": "success",
-        "entities": entities_out,
-        "alerts": alerts_out,
-        "resolved_context": result.normalized_text,
-        "detected_actions": detected_actions,
-    }
-
-
 # --- ROUTES ---
 
 
 @router.post("/save")
 async def save_draft(request: SaveRequest):
     """
-    Saves narrative chunk immediately for persistence without
-    triggering NLP analysis.
+    Saves narrative chunk immediately for persistence with lightweight analysis.
+    Uses the analysis orchestrator in auto_save mode.
     """
     try:
-        content = request.content
-        project_id = request.project_id
-
-        embedding = None
-        try:
-            embedding = get_embedding(content)
-        except Exception:
-            pass
-
-        store = ExtractionStore(project_id=project_id, supabase_client=supabase_client)
-        store.insert_narrative_chunk(content=content, embedding=embedding)
-
-        return {"status": "saved", "project_id": project_id}
+        orchestrator = AnalysisOrchestrator(supabase_client=supabase_client)
+        result = await orchestrator.process_content(
+            project_id=request.project_id,
+            content=request.content,
+            mode="auto_save"
+        )
+        
+        return {
+            "status": result.get("status", "saved"),
+            "project_id": request.project_id
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -202,12 +92,17 @@ async def save_draft(request: SaveRequest):
 async def analyze_writing(request: WriteRequest):
     """
     Manual trigger for full narrative analysis.
-    Runs extraction, persists KG/entities, and returns alerts/entities.
+    Uses the analysis orchestrator in manual_analyze mode.
     """
     try:
-        return await run_analysis(
-            project_id=request.project_id, text_content=request.content
+        orchestrator = AnalysisOrchestrator(supabase_client=supabase_client)
+        result = await orchestrator.process_content(
+            project_id=request.project_id,
+            content=request.content,
+            mode="manual_analyze"
         )
+        
+        return result
     except Exception as e:
         print(f"CRITICAL ERROR in /editor/analyze: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Narrative Engine Error: {str(e)}")
@@ -297,6 +192,8 @@ async def get_editing_suggestion(request: SuggestionRequest):
     narrative history, and knowledge graph facts.
     """
     try:
+        kg_cache = get_kg_cache()
+        
         # 1. Fetch style blueprint
         project = (
             supabase_client.table("projects")
@@ -318,19 +215,24 @@ async def get_editing_suggestion(request: SuggestionRequest):
         )
         history = [row["content"] for row in reversed(history_resp.data or [])]
 
-        # 3. Fetch Knowledge Graph Facts (relationships)
-        kg = StoryKnowledgeGraph.from_supabase(
-            project_id=request.project_id, supabase_client=supabase_client
-        )
+        # 3. Fetch Knowledge Graph Facts (relationships) using cache
+        kg = kg_cache.get(request.project_id)
+        if kg is None:
+            kg = StoryKnowledgeGraph.from_supabase(
+                project_id=request.project_id, supabase_client=supabase_client
+            )
+            kg_cache.set(request.project_id, kg)
+        
         graph_facts = []
         for u, v, data in kg.graph.edges(data=True):
             graph_facts.append(f"{u} {data.get('relation', 'is related to')} {v}")
 
-        # 4. Get suggestion
+        # 4. Get suggestion with project_id for RAG and POV/tone
         service = get_suggestion_service()
         suggestion = service.get_ghost_suggestion(
             context_text=request.content,
             blueprint=blueprint,
+            project_id=request.project_id,  # NEW: Pass project_id
             history=history,
             graph_facts=graph_facts[:15],  # Limit to avoid token bloat
         )
@@ -350,9 +252,12 @@ async def generate_suggestions(request: GenerateSuggestionsRequest):
     try:
         content = request.content
 
-        # Fetch alerts by running analysis
-        analysis_result = await run_analysis(
-            project_id=request.project_id, text_content=content
+        # Fetch alerts by running analysis using orchestrator
+        orchestrator = AnalysisOrchestrator(supabase_client=supabase_client)
+        analysis_result = await orchestrator.process_content(
+            project_id=request.project_id,
+            content=content,
+            mode="manual_analyze"
         )
         alerts = analysis_result.get("alerts", [])
 
@@ -389,26 +294,6 @@ async def generate_suggestions(request: GenerateSuggestionsRequest):
         raise HTTPException(
             status_code=500, detail=f"Failed to generate suggestions: {str(e)}"
         )
-
-
-@router.post("/fix-spelling")
-async def fix_spelling(request: FixSpellingRequest):
-    """
-    Fix a specific spelling error in the text.
-    Returns the corrected text.
-    """
-    try:
-        correction_suite = get_correction_suite()
-        corrected_text = correction_suite.apply_spelling_fix(
-            request.content, request.word, request.suggestion
-        )
-        return {"status": "success", "corrected_text": corrected_text}
-    except Exception as e:
-        print(f"Fix Spelling Error: {e}")
-        import traceback
-
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to fix spelling: {str(e)}")
 
 
 @router.post("/get-grammar-suggestion")

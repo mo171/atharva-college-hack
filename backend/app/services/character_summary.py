@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import datetime, timezone
 from typing import Any
@@ -11,6 +12,30 @@ from supabase import Client
 
 from lib.supabase import supabase_client as _default_supabase
 from services.llm_gateway import get_embedding
+from config import settings
+
+
+def should_update_summary(entity_metadata: dict) -> bool:
+    """
+    Check if a character summary needs updating based on throttle time.
+    
+    Args:
+        entity_metadata: The entity's metadata dictionary
+        
+    Returns:
+        True if summary should be updated, False if within throttle period
+    """
+    last_update = entity_metadata.get("last_summary_update")
+    if not last_update:
+        return True
+    
+    try:
+        last_update_dt = datetime.fromisoformat(last_update.replace('Z', '+00:00'))
+        delta = datetime.now(timezone.utc) - last_update_dt
+        return delta.total_seconds() > settings.character_summary_throttle_seconds
+    except (ValueError, AttributeError):
+        # If parsing fails, allow update
+        return True
 
 
 def _gather_character_context(
@@ -223,6 +248,7 @@ def update_character_summary(
         "persona_summary": persona_summary,
         "story_summary": story_summary,
         "summary_updated_at": datetime.now(timezone.utc).isoformat(),
+        "last_summary_update": datetime.now(timezone.utc).isoformat(),  # For throttling
     }
 
     supabase.table("entities").update({"metadata": updated_metadata}).eq(
@@ -230,3 +256,89 @@ def update_character_summary(
     ).execute()
 
     return updated_metadata
+
+
+async def batch_update_character_summaries(
+    project_id: str,
+    character_names: list[str],
+    mention_counts: dict[str, int] | None = None,
+    max_updates: int = 3,
+    supabase_client: Client | None = None,
+    api_key: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Update character summaries in batch with throttling and prioritization.
+    
+    Fetches character entities, filters by throttle time, sorts by mention count,
+    and updates summaries for the top N characters in parallel.
+    
+    Args:
+        project_id: The project identifier
+        character_names: List of character names to consider
+        mention_counts: Optional dict mapping character names to mention counts
+        max_updates: Maximum number of summaries to update (default: 3)
+        supabase_client: Optional Supabase client
+        api_key: Optional OpenAI API key
+        
+    Returns:
+        List of updated metadata dictionaries
+    """
+    supabase = supabase_client or _default_supabase
+    
+    # Fetch character entities
+    entities_resp = (
+        supabase.table("entities")
+        .select("id, name, entity_type, metadata")
+        .eq("project_id", project_id)
+        .eq("entity_type", "CHARACTER")
+        .in_("name", character_names)
+        .execute()
+    )
+    
+    entities = entities_resp.data or []
+    
+    # Filter entities that need updates (check throttle)
+    entities_to_update = []
+    for entity in entities:
+        metadata = entity.get("metadata") or {}
+        if should_update_summary(metadata):
+            entities_to_update.append(entity)
+    
+    if not entities_to_update:
+        return []
+    
+    # Sort by mention count if provided
+    if mention_counts:
+        entities_to_update.sort(
+            key=lambda e: mention_counts.get(e["name"], 0),
+            reverse=True
+        )
+    
+    # Limit to max_updates
+    entities_to_update = entities_to_update[:max_updates]
+    
+    # Update summaries in parallel using asyncio.gather
+    async def update_one(entity: dict) -> dict[str, Any] | None:
+        """Async wrapper for update_character_summary."""
+        try:
+            # Run the sync function in a thread pool
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                update_character_summary,
+                project_id,
+                entity["id"],
+                supabase_client,
+                api_key
+            )
+            return result
+        except Exception:
+            return None
+    
+    results = await asyncio.gather(
+        *[update_one(entity) for entity in entities_to_update],
+        return_exceptions=True
+    )
+    
+    # Filter out None and exceptions
+    return [r for r in results if r is not None and not isinstance(r, Exception)]

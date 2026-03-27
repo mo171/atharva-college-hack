@@ -19,6 +19,21 @@ class Inconsistency:
     message: str
 
 
+STATEFUL_RELATIONS = {
+    "BE",
+    "IS",
+    "WAS",
+    "LOCATED",
+    "IN",
+    "HAS",
+    "OWN",
+    "POSSESS",
+    "LIVE",
+    "STAY",
+    "DWELL",
+}
+
+
 class StoryKnowledgeGraph:
     """Story memory graph that can load from and sync to Supabase."""
 
@@ -182,6 +197,12 @@ class StoryKnowledgeGraph:
         self, subject: str, relation: str, obj: str
     ) -> Inconsistency | None:
         relation = relation.upper()
+
+        # Only check contradiction for stateful relations (e.g. Location, Ownership, Identity)
+        # Transient actions (went, saw, hit) can have multiple objects without being contradictions
+        if relation not in STATEFUL_RELATIONS:
+            return None
+
         existing_objects = self.get_objects_for_relation(subject, relation)
 
         if not existing_objects or obj in existing_objects:

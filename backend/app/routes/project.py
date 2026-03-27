@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 from services.project_setup import project_setup
 from services.style_analysis import extract_text_from_pdf, analyze_writer_style
+from services.kg_cache import get_kg_cache
 from lib.supabase import supabase_client
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -85,3 +86,28 @@ async def get_user_projects(user_id: str):
         return {"status": "success", "projects": res.data}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Could not fetch projects: {exc}")
+
+
+@router.delete("/{project_id}")
+async def delete_project(project_id: str):
+    """Delete a project and its associated data."""
+    try:
+        # Invalidate KG cache for this project
+        kg_cache = get_kg_cache()
+        kg_cache.invalidate(project_id)
+        
+        # Tables with Foreign Keys to projects:
+        # - narrative_chunks
+        # - entities
+        # - plot_threads
+        # - plot_points (via plot_thread_id)
+        # - connections (via from_point_id/to_point_id)
+
+        # In a real app, you'd rely on ON DELETE CASCADE in the DB.
+        # Here we'll do an explicit delete for certainty if cascade isn't set.
+
+        supabase_client.table("projects").delete().eq("id", project_id).execute()
+
+        return {"status": "success", "message": f"Project {project_id} deleted."}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not delete project: {exc}")

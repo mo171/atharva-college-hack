@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from importlib import import_module
 from importlib.util import find_spec
@@ -29,6 +30,22 @@ ENTITY_LABEL_MAP = {
     "LANGUAGE": "OBJECT",
     "DATE": "OBJECT",
     "TIME": "OBJECT",
+}
+TRANSIENT_VERBS = {
+    "SAY",
+    "THINK",
+    "FEEL",
+    "KNOW",
+    "WANT",
+    "LOOK",
+    "SEE",
+    "HEAR",
+    "SMELL",
+    "NOTICE",
+    "TELL",
+    "ASK",
+    "REPLY",
+    "WONDER",
 }
 
 
@@ -67,6 +84,38 @@ class ExtractionStore:
             .execute()
         )
         return bool(row.data)
+    
+    def _compute_content_hash(self, content: str) -> str:
+        """
+        Compute a SHA-256 hash of the content for deduplication.
+        
+        Args:
+            content: The text content to hash
+            
+        Returns:
+            First 16 characters of the SHA-256 hash
+        """
+        return hashlib.sha256(content.encode()).hexdigest()[:16]
+    
+    def _chunk_exists(self, content_hash: str) -> bool:
+        """
+        Check if a chunk with the same content hash already exists.
+        
+        Args:
+            content_hash: The content hash to check
+            
+        Returns:
+            True if a chunk with this hash exists, False otherwise
+        """
+        row = (
+            self.supabase.table("narrative_chunks")
+            .select("id")
+            .eq("project_id", self.project_id)
+            .eq("content_hash", content_hash)
+            .limit(1)
+            .execute()
+        )
+        return bool(row.data)
 
     def upsert_entities(self, entities: list[dict[str, str]]) -> None:
         for entity in entities:
@@ -86,8 +135,16 @@ class ExtractionStore:
             ).execute()
 
     def insert_narrative_chunk(
-        self, content: str, embedding: list[float] | None = None
+        self, content: str, embedding: list[float] | None = None, content_hash: str | None = None
     ) -> None:
+        # Compute content hash for deduplication if not provided
+        if content_hash is None:
+            content_hash = self._compute_content_hash(content)
+        
+        # Check if this content already exists
+        if self._chunk_exists(content_hash):
+            return  # Skip duplicate content
+        
         max_index_query = (
             self.supabase.table("narrative_chunks")
             .select("chunk_index")
@@ -103,6 +160,7 @@ class ExtractionStore:
             "project_id": self.project_id,
             "content": content,
             "chunk_index": next_idx,
+            "content_hash": content_hash,
         }
         if embedding is not None:
             payload["embedding"] = embedding
@@ -173,6 +231,10 @@ def _triples_from_sentence(sentence: Span) -> list[SVOTriple]:
 
     for token in sentence:
         if token.pos_ != "VERB":
+            continue
+
+        verb_lemma = token.lemma_.upper()
+        if verb_lemma in TRANSIENT_VERBS:
             continue
 
         subjects = _collect_subjects(token)

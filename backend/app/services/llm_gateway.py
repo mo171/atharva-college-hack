@@ -80,11 +80,11 @@ class InsightGenerator:
         return alert
 
     def generate_grammar_alerts(self, text: str) -> list[dict]:
-        """Detect grammar, punctuation, and style issues using LLM."""
+        """Detect spelling, grammar, punctuation, and style issues using LLM."""
         prompt = (
-            "You are a professional copyeditor. Analyze the following text for grammar, punctuation, and flow issues. "
+            "You are a professional copyeditor. Analyze the following text for spelling, grammar, punctuation, and flow issues. "
             "Return a list of alerts in the following format, separated by newlines:\n"
-            "TYPE: [GRAMMAR|STYLE] | TEXT: [specific error clip] | EXPLANATION: [concise suggestion]\n\n"
+            "TYPE: [SPELLING|GRAMMAR|STYLE] | TEXT: [specific error clip] | EXPLANATION: [concise suggestion]\n\n"
             "CRITICAL: The TEXT: field MUST contain the EXACT character-for-character clip from the original text (including punctuation and spaces). "
             "DO NOT wrap the text clip in quotes, brackets, or any other characters. "
             "If no issues, return 'OK'.\n\n"
@@ -171,11 +171,17 @@ class SupabaseInsightService:
         relation = "RELATED_TO"
         object_value = "UNKNOWN_OBJECT"
 
-        match = re.search(r"Inconsistency for \((.?), (.?), (.*?)\)", explanation)
+        match = re.search(r"Inconsistency for \((.*?), (.*?), (.*?)\)", explanation)
         if match:
             subject = match.group(1).strip()
             relation = match.group(2).strip()
             object_value = match.group(3).strip()
+        else:
+            # Fallback for old or manual logs that don't match the strict tuple format
+            # Try to grab the first few words if nothing else
+            if "Inconsistency for" in explanation:
+                snippet = explanation.split("Inconsistency for")[-1].strip()
+                subject = snippet.split(",")[0].strip("() ")
 
         existing_objects: list[str] = []
         marker = "Existing graph facts:"

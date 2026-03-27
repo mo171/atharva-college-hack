@@ -40,6 +40,16 @@ export async function fetchUserProjects(userId) {
 }
 
 /**
+ * Delete a project.
+ * @param {string} projectId
+ * @returns {Promise<{ status: string, message: string }>}
+ */
+export async function deleteProject(projectId) {
+  const { data } = await api.delete(`/projects/${projectId}`);
+  return data;
+}
+
+/**
  * Analyze writing content for a project.
  * @param {{ projectId: string, content: string }}
  * @returns {Promise<{ status: string, entities: Array, alerts: Array, resolved_context: string, detected_actions: Array }>}
@@ -130,30 +140,6 @@ export async function generateSuggestions({ projectId, content }) {
       response: error.response?.data,
       status: error.response?.status,
       url: error.config?.url,
-    });
-    throw error;
-  }
-}
-
-/**
- * Fix a spelling error in the text.
- * @param {{ projectId: string, content: string, word: string, suggestion: string }}
- * @returns {Promise<{ status: string, corrected_text: string }>}
- */
-export async function fixSpelling({ projectId, content, word, suggestion }) {
-  try {
-    const { data } = await api.post("/editor/fix-spelling", {
-      project_id: projectId,
-      content,
-      word,
-      suggestion,
-    });
-    return data;
-  } catch (error) {
-    console.error("Fix spelling API error:", {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
     });
     throw error;
   }
