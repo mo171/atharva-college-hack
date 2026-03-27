@@ -1,0 +1,4 @@
+# file: C:\movin\programing\3_projects\projects\atharva college\backend\app\services\llm_gateway.py
+# hypothesis_version: 6.151.9
+
+[0.1, 0.2, '"', "'", '\'"', '() ', ',', ', ', '.', 'EXPLANATION:', 'GRAMMAR', 'INCONSISTENCY', 'Inconsistency for', 'OK', 'OPENAI_API_KEY', 'PENDING', 'RELATED_TO', 'TEXT:', 'TYPE:', 'UNKNOWN_OBJECT', 'UNKNOWN_SUBJECT', '[', '[]', ']', 'alert', 'consistency_logs', 'content', 'created_at', 'entity', 'existing_objects', 'explanation', 'gpt-4o-mini', 'id', 'issue_type', 'log_id', 'none', 'object', 'original_text', 'project_id', 'relation', 'role', 'status', 'subject', 'suggested_fix', 'type', 'user', '|']

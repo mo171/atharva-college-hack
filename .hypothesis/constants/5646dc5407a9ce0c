@@ -1,0 +1,4 @@
+# file: C:\movin\programing\3_projects\projects\atharva college\backend\app\services\rag.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.3, 'chunk_index', 'content', 'content, chunk_index', 'match_count', 'match_threshold', 'narrative_chunks', 'p_project_id', 'project_id', 'query_embedding', 'similarity']

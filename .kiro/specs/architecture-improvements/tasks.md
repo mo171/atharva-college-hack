@@ -80,7 +80,8 @@ This implementation plan breaks down the architecture improvements into discrete
   - Add POV validation logic (e.g., first-person check)
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 1.1, 1.2, 1.3_
 
-- [ ]* 2.2 Write property test for POV consistency
+- [x] 2.2 Write property test for POV consistency
+
   - **Property 4: POV Consistency**
   - **Validates: Requirements 3.5**
 

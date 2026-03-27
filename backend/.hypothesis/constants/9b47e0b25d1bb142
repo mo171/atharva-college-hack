@@ -1,0 +1,4 @@
+# file: C:\movin\programing\3_projects\projects\atharva college\backend\app\config.py
+# hypothesis_version: 6.151.9
+
+[',', '.env', '0.3', '100', '3', '300', '600', 'BACKEND_CORS_ORIGINS', 'KG_CACHE_MAX_SIZE', 'KG_CACHE_TTL_SECONDS', 'OPENAI_API_KEY', 'OPENAI_CHAT_MODEL', 'RAG_TOP_K', 'SUPABASE_URL', 'gpt-4o-mini']
